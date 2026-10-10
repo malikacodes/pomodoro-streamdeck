@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this key's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+    <!-- On its own a color swatch stretches across the whole row. This
+         keeps it to a small box. -->
+    <style>
+      sdpi-color {
+        display: block;
+        width: 36px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- What I'm timing. The name is also what the heat map files this
+         task's focus time under, so renaming it starts a new map. -->
+    <sdpi-item label="Task">
+      <sdpi-textfield setting="name" placeholder="Focus" maxlength="30"></sdpi-textfield>
+    </sdpi-item>
+    <!-- This task's heat map, and its time on the key during a break. -->
+    <sdpi-item label="Color">
+      <sdpi-color setting="color" default="#f2a7c3"></sdpi-color>
+    </sdpi-item>
+
+    <!-- Off makes it one plain countdown: no breaks and no rounds. -->
+    <sdpi-item label="Interval timer">
+      <sdpi-checkbox setting="intervals" default="true" label="Focus and breaks in rounds"></sdpi-checkbox>
+    </sdpi-item>
+    <!-- The lengths are in minutes. Anything that isn't a number goes
+         back to the gray number shown in the box (see plan in
+         src/timer.js). -->
+    <sdpi-item label="Focus">
+      <sdpi-textfield setting="focus" placeholder="45" pattern="[0-9.]*"></sdpi-textfield>
+    </sdpi-item>
+    <!-- How many focus rounds before the long break. One dot each. -->
+    <sdpi-item label="Rounds">
+      <sdpi-select setting="rounds" default="4">
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4</option>
+        <option value="5">5</option>
+        <option value="6">6</option>
+        <option value="7">7</option>
+        <option value="8">8</option>
+      </sdpi-select>
+    </sdpi-item>
+    <sdpi-item label="Short break">
+      <sdpi-textfield setting="shortBreak" placeholder="10" pattern="[0-9.]*"></sdpi-textfield>
+    </sdpi-item>
+    <sdpi-item label="Long break">
+      <sdpi-textfield setting="longBreak" placeholder="15" pattern="[0-9.]*"></sdpi-textfield>
+    </sdpi-item>
+
+    <!-- Off: when a period ends, the next one waits for a tap. -->
+    <sdpi-item label="Auto start">
+      <sdpi-checkbox setting="autoStart" label="Start the next one by itself"></sdpi-checkbox>
+    </sdpi-item>
+    <!-- Tapping twice jumps to the break, or from a break back to focus.
+         While this is on, a single tap takes a third of a second longer,
+         because the key waits to see if a second tap is coming. -->
+    <sdpi-item label="Double tap">
+      <sdpi-checkbox setting="doubleTap" default="true" label="Tap twice to jump to the break"></sdpi-checkbox>
+    </sdpi-item>
+  </body>
+</html>
