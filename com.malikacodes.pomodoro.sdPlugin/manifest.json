@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
+  "UUID": "com.malikacodes.pomodoro",
+  "Name": "Pomodoro",
+  "Author": "Malika Codes",
+  "Description": "A Pomodoro timer on a key, one key per task, and a heat map of my focus time on a dial.",
+  "Version": "0.1.0.0",
+  "SDKVersion": 3,
+  "CodePath": "bin/plugin.js",
+  "Icon": "imgs/plugin",
+  "CategoryIcon": "imgs/timer",
+  "Category": "Pomodoro",
+  "Nodejs": { "Version": "24" },
+  "Software": { "MinimumVersion": "7.1" },
+  "OS": [ { "Platform": "mac", "MinimumVersion": "13" } ],
+  "Actions": [
+    {
+      "UUID": "com.malikacodes.pomodoro.timer",
+      "Name": "Timer",
+      "Tooltip": "Tap to start, pause or carry on. Hold to finish. Tap twice to jump to the break.",
+      "Icon": "imgs/timer",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/timer.html",
+      "States": [ { "Image": "imgs/key" } ]
+    },
+    {
+      "UUID": "com.malikacodes.pomodoro.heatmap",
+      "Name": "Heat Map",
+      "Tooltip": "My focus time, one square a day. Turn to flip between all tasks and each one. Tap to go back to all. Press to jump to the break.",
+      "Icon": "imgs/timer",
+      "Controllers": ["Encoder"],
+      "UserTitleEnabled": false,
+      "Encoder": {
+        "layout": "layouts/strip.json",
+        "TriggerDescription": {
+          "Rotate": "All tasks or one",
+          "Push": "Jump to break",
+          "Touch": "Back to all"
+        }
+      },
+      "States": [ { "Image": "imgs/key" } ]
+    }
+  ]
+}

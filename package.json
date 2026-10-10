@@ -1,0 +1,14 @@
+{
+  "name": "pomodoro-streamdeck",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A Pomodoro timer on a Stream Deck key, with a heat map of my focus time on a dial",
+  "dependencies": {
+    "@elgato/streamdeck": "3.0.1"
+  },
+  "scripts": {
+    "check": "for f in src/*.js test/*.js; do node --check \"$f\" || exit 1; done",
+    "test": "node --test test/*.test.js"
+  }
+}
