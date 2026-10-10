@@ -91,9 +91,12 @@ export class History {
   }
 
   // Each task's color is kept here too, so a task whose key I've taken
-  // off the deck still gets its own color on the map.
+  // off the deck still gets its own color on the map. Only for a task
+  // with focus time saved, though. The settings box sends the name after
+  // every letter I type, and without this the file fills up with colors
+  // for "5", "59" and "593".
   remember(task, color) {
-    if (this.data.colors[task] === color) return;
+    if (this.data.colors[task] === color || !this.data.sessions.some(s => s.task === task)) return;
     this.data.colors[task] = color;
     return this.#write("sessions.json", this.data);
   }

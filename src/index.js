@@ -43,8 +43,11 @@ function announce(task, finished) {
 // Whatever the timer hands back after a command or a tick gets filed
 // here: a finished focus session goes into the history, and the timer as
 // it stands now is saved in case the plugin restarts.
-function keep(result, now) {
-  if (result?.session) history.add(result.session, now);
+function keep(result, now, color) {
+  if (result?.session) {
+    history.add(result.session, now);
+    history.remember(result.session.task, color);
+  }
   history.saveRun(timer.run);
 }
 
@@ -57,6 +60,8 @@ function keep(result, now) {
 //   "nothing"  there was nothing to do
 function act(command, settings, now = Date.now()) {
   const mine = settings === null || timer.owns(settings);
+  // Read before the command runs, because Done clears the timer.
+  const color = timer.run?.color;
   let outcome = "ok";
 
   if (!timer.run) {
@@ -69,9 +74,9 @@ function act(command, settings, now = Date.now()) {
     timer.toggle(now);
     keep(null, now);
   } else if (command === "skip") {
-    keep(timer.skip(now), now);
+    keep(timer.skip(now), now, color);
   } else if (command === "done") {
-    keep(timer.done(now), now);
+    keep(timer.done(now), now, color);
     outcome = "done";
   }
 
@@ -95,7 +100,10 @@ class TimerKey extends SingletonAction {
 
     // Renaming a task that's running: the timer keeps going under the
     // new name, so this key can still pause and finish it.
-    timer.rename(before, plan(ev.payload.settings).task);
+    const next = plan(ev.payload.settings);
+    timer.rename(before, next.task);
+    // A new color mid-timer goes with the session when it's saved.
+    if (timer.owns(ev.payload.settings)) timer.run.color = next.color;
     history.saveRun(timer.run);
 
     this.remember(ev.action.id);
@@ -255,9 +263,10 @@ streamDeck.actions.registerAction(heatMap);
 setInterval(() => {
   const now = Date.now();
   const task = timer.run?.task;
+  const color = timer.run?.color;
   const result = timer.tick(now);
   if (result) {
-    keep(result, now);
+    keep(result, now, color);
     announce(task, result.finished);
   }
   redraw();

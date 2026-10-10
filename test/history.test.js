@@ -61,12 +61,24 @@ test("totals add up a day for one task or for all of them", async () => {
 test("a task's color is remembered in the file", async () => {
   const dir = await freshDir();
   const first = new History({ dir, logger: quiet });
+  first.add({ task: "Reading", minutes: 45 }, at(2026, 10, 10));
   await first.remember("Reading", "#88ccff");
 
   const second = new History({ dir, logger: quiet });
   await second.load();
   assert.equal(second.colorOf("Reading"), "#88ccff");
   assert.equal(second.colorOf("Never heard of it"), undefined);
+});
+
+// The settings box sends the name after every letter, so "5" and "59"
+// turn up on the way to "593". Only a task with focus time keeps a color.
+test("a name with no focus time doesn't get a color saved", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  h.remember("5", "#88ccff");
+  h.remember("59", "#88ccff");
+  await h.add({ task: "593", minutes: 45 }, at(2026, 10, 10));
+  await h.remember("593", "#88ccff");
+  assert.deepEqual(h.data.colors, { 593: "#88ccff" });
 });
 
 // A file that got mangled starts me fresh and doesn't crash the plugin.
