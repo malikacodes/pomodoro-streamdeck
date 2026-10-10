@@ -1,0 +1,115 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { History, dataDir, dayOf, lastWeeks, level } from "../src/history.js";
+
+// Every test gets its own empty folder, so none of them can see my real
+// history or each other's.
+const freshDir = () => mkdtemp(join(tmpdir(), "pomodoro-"));
+const quiet = { warn() {} };
+const at = (y, m, d, h = 12) => new Date(y, m - 1, d, h).getTime();
+
+// The tests point the data folder somewhere else with POMODORO_HOME.
+// If that stopped working they'd write into my real history.
+test("POMODORO_HOME moves the data folder", () => {
+  assert.equal(dataDir({ POMODORO_HOME: "/tmp/elsewhere" }), "/tmp/elsewhere");
+  assert.match(dataDir({}), /Application Support\/com\.malikacodes\.pomodoro$/);
+});
+
+// A session that ends at 11pm belongs to today, not to tomorrow in UTC.
+test("a late night session is filed under my own day", () => {
+  assert.equal(dayOf(at(2026, 10, 10, 23)), "2026-10-10");
+  assert.equal(dayOf(at(2026, 3, 1, 0)), "2026-03-01");
+});
+
+// The map's five shades. The edges matter: 45 is a full session.
+test("levels step up at 45, 90 and 180 minutes", () => {
+  assert.deepEqual([0, 0.5, 44.9, 45, 89, 90, 179, 180, 400].map(level), [0, 1, 1, 2, 2, 3, 3, 4, 4]);
+});
+
+// Saved sessions have to still be there after the plugin restarts.
+test("sessions are still there after loading the file again", async () => {
+  const dir = await freshDir();
+  const first = new History({ dir, logger: quiet });
+  first.add({ task: "Reading", minutes: 45 }, at(2026, 10, 9));
+  await first.add({ task: "Cleaning", minutes: 20 }, at(2026, 10, 10));
+
+  const second = new History({ dir, logger: quiet });
+  await second.load();
+  assert.deepEqual(second.tasks(), ["Reading", "Cleaning"]);
+  assert.equal(second.totals().get("2026-10-10"), 20);
+});
+
+// The two maps: one task, or everything added up.
+test("totals add up a day for one task or for all of them", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  const today = at(2026, 10, 10);
+  h.add({ task: "Reading", minutes: 45 }, today);
+  h.add({ task: "Reading", minutes: 12.5 }, today);
+  h.add({ task: "Cleaning", minutes: 20 }, today);
+  await h.add({ task: "Reading", minutes: 30 }, at(2026, 10, 9));
+
+  assert.equal(h.totals("Reading").get("2026-10-10"), 57.5);
+  assert.equal(h.totals("Cleaning").get("2026-10-10"), 20);
+  assert.equal(h.totals().get("2026-10-10"), 77.5);
+  assert.equal(h.totals("Cleaning").get("2026-10-09"), undefined);
+});
+
+// A task's color has to outlive its key.
+test("a task's color is remembered in the file", async () => {
+  const dir = await freshDir();
+  const first = new History({ dir, logger: quiet });
+  await first.remember("Reading", "#88ccff");
+
+  const second = new History({ dir, logger: quiet });
+  await second.load();
+  assert.equal(second.colorOf("Reading"), "#88ccff");
+  assert.equal(second.colorOf("Never heard of it"), undefined);
+});
+
+// A file that got mangled starts me fresh and doesn't crash the plugin.
+test("a broken history file is ignored", async () => {
+  const dir = await freshDir();
+  await writeFile(join(dir, "sessions.json"), '{"v":1,"sessions":"oops"}');
+  const h = new History({ dir, logger: quiet });
+  await h.load();
+  assert.deepEqual(h.tasks(), []);
+});
+
+// The running timer goes to its own file and comes back the same, and
+// clearing it really clears it.
+test("the running timer is saved, loaded and cleared", async () => {
+  const dir = await freshDir();
+  const h = new History({ dir, logger: quiet });
+  assert.equal(await h.loadRun(), null);
+  await h.saveRun({ task: "Reading", endsAt: 123 });
+  assert.deepEqual(await h.loadRun(), { task: "Reading", endsAt: 123 });
+  await h.saveRun(null);
+  assert.equal(await h.loadRun(), null);
+  assert.equal(await readFile(join(dir, "state.json"), "utf8"), "null");
+});
+
+// The map's grid: today sits in the last column on its own weekday, and
+// the rest of this week is left empty.
+test("the last weeks end on today, Sunday at the top", () => {
+  // 2026-10-10 is a Saturday, so the last column is a full week.
+  const full = lastWeeks(at(2026, 10, 10), 14);
+  assert.equal(full.length, 14);
+  assert.deepEqual(full.at(-1), ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10"]);
+  assert.equal(full[0][0], "2026-07-05");
+
+  // The Wednesday before: Thursday to Saturday haven't happened yet.
+  const part = lastWeeks(at(2026, 10, 7), 2);
+  assert.deepEqual(part.at(-1), ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", undefined, undefined, undefined]);
+  assert.equal(part[0][6], "2026-10-03");
+});
+
+// The clocks go back on 2026-11-01. Counting days in milliseconds would
+// repeat or skip one around then.
+test("a clock change doesn't repeat or skip a day", () => {
+  const days = lastWeeks(at(2026, 11, 7), 2).flat();
+  assert.equal(new Set(days).size, 14);
+  assert.deepEqual(days.slice(6, 9), ["2026-10-31", "2026-11-01", "2026-11-02"]);
+});
