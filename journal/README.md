@@ -8,3 +8,4 @@ second.
 | # | Date | Entry |
 |---|---|---|
 | 01 | 2026-10-10 | [A timer on a key](01-a-timer-on-a-key.md) |
+| 02 | 2026-10-12 | [The hole on Mondays](02-the-hole-on-mondays.md) |
