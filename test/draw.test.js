@@ -84,7 +84,7 @@ test("the strip has a square per day and shades them by minutes", () => {
   assert.equal(full.match(/<rect x=/g).length, 14 * 7);
   assert.equal(full.match(/fill="#f2a7c3"/g).length, 1);
   assert.equal(full.match(new RegExp(`fill="${ramp("#f2a7c3")[1]}"`, "g")).length, 1);
-  assert.equal(full.match(/fill="#1e1e21"/g).length, 14 * 7 - 2);
+  assert.equal(full.match(/fill="#21262d"/g).length, 14 * 7 - 2);
 
   // Wednesday: three days of this week are missing.
   const wednesday = new Date(2026, 9, 7, 12).getTime();

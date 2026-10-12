@@ -11,9 +11,11 @@ const FONT = "-apple-system, Helvetica, sans-serif";
 // square next to the keys around it.
 const BLACK = "#000000";
 
-// A square for a day with no focus time. It has to show against the
-// black, and still be darker than the faintest colored square.
-const EMPTY = "#1e1e21";
+// A square for a day with no focus time. It's the same color as an empty
+// day on my GitHub Graph dial, so the two maps match when they sit side
+// by side. It has to show against the black, and still be darker than
+// the faintest colored square.
+const EMPTY = "#21262d";
 
 // Task names are whatever I typed, and a < or an & would break the SVG.
 function safe(text) {
