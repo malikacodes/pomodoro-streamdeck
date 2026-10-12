@@ -103,18 +103,21 @@ test("the running timer is saved, loaded and cleared", async () => {
   assert.equal(await readFile(join(dir, "state.json"), "utf8"), "null");
 });
 
-// The map's grid: today sits in the last column on its own weekday, and
-// the rest of this week is left empty.
-test("the last weeks end on today, Sunday at the top", () => {
-  // 2026-10-10 is a Saturday, so the last column is a full week.
+// The map's grid: the last column is the week I'm in, all seven days of
+// it, with every day in the row for its own weekday.
+test("the last weeks end on this week's Saturday, Sunday at the top", () => {
+  const week = ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10"];
+
+  // 2026-10-10 is a Saturday.
   const full = lastWeeks(at(2026, 10, 10), 14);
   assert.equal(full.length, 14);
-  assert.deepEqual(full.at(-1), ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09", "2026-10-10"]);
+  assert.deepEqual(full.at(-1), week);
   assert.equal(full[0][0], "2026-07-05");
 
-  // The Wednesday before: Thursday to Saturday haven't happened yet.
+  // The Wednesday before gets the same column: Thursday to Saturday are
+  // in it even though they haven't happened yet.
   const part = lastWeeks(at(2026, 10, 7), 2);
-  assert.deepEqual(part.at(-1), ["2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07", undefined, undefined, undefined]);
+  assert.deepEqual(part.at(-1), week);
   assert.equal(part[0][6], "2026-10-03");
 });
 

@@ -33,7 +33,9 @@ export function level(minutes) {
 
 // The last few weeks as columns for the map, oldest first. Each column is
 // a week, Sunday at the top, and each slot is a day like "2026-10-10".
-// The days after today haven't happened, so they're left empty.
+// The week I'm in is always all seven days, the ones that haven't
+// happened yet included, so the map stays a full rectangle. On a Monday
+// the last column would otherwise be two squares over a hole.
 export function lastWeeks(now, count) {
   const today = new Date(now);
   today.setHours(12, 0, 0, 0);
@@ -45,7 +47,7 @@ export function lastWeeks(now, count) {
       // repeat a day.
       const d = new Date(today);
       d.setDate(today.getDate() - today.getDay() - w * 7 + slot);
-      week.push(d > today ? undefined : dayOf(d.getTime()));
+      week.push(dayOf(d.getTime()));
     }
     columns.push(week);
   }

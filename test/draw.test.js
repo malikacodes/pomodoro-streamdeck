@@ -6,7 +6,7 @@ import { lastWeeks } from "../src/history.js";
 const MIN = 60000;
 const face = more => ({ label: "Reading", ms: 45 * MIN, tone: "running", color: "#88ccff", rounds: 4, done: 1, current: 2, ...more });
 const saturday = new Date(2026, 9, 10, 12).getTime();
-const strip = more => drawStrip({ columns: lastWeeks(saturday, WEEKS_SHOWN), totals: new Map(), color: "#f2a7c3", ...more });
+const strip = more => drawStrip({ columns: lastWeeks(saturday, WEEKS_SHOWN), totals: new Map(), today: "2026-10-10", color: "#f2a7c3", ...more });
 
 // The deck is pure black, so a lighter background shows as a gray square.
 test("the key and the strip are drawn on pure black", () => {
@@ -76,20 +76,37 @@ test("a bad color falls back to pink", () => {
   assert.match(drawKey(face({ tone: "break", color: '"><script>' })), /fill="#f2a7c3" font-size="38"/);
 });
 
-// The map: one square per day that's happened, shaded by that day's
-// minutes, and nothing for the days still to come.
+// The map: one square per day, shaded by that day's minutes.
 test("the strip has a square per day and shades them by minutes", () => {
-  // Saturday, so all 14 weeks are full.
+  // Saturday, so every day of all 14 weeks has happened.
   const full = strip({ totals: new Map([["2026-10-10", 200], ["2026-10-09", 30]]) });
   assert.equal(full.match(/<rect x=/g).length, 14 * 7);
   assert.equal(full.match(/fill="#f2a7c3"/g).length, 1);
   assert.equal(full.match(new RegExp(`fill="${ramp("#f2a7c3")[1]}"`, "g")).length, 1);
   assert.equal(full.match(/fill="#21262d"/g).length, 14 * 7 - 2);
+});
 
-  // Wednesday: three days of this week are missing.
-  const wednesday = new Date(2026, 9, 7, 12).getTime();
-  const part = drawStrip({ columns: lastWeeks(wednesday, WEEKS_SHOWN), totals: new Map(), color: "#f2a7c3" });
-  assert.equal(part.match(/<rect x=/g).length, 14 * 7 - 3);
+// On a Monday the last column used to be two squares over a black hole.
+// The days still to come get their own darker square, so the map stays a
+// full rectangle and "not yet" doesn't look like "nothing that day".
+test("the rest of this week is drawn as upcoming squares, not left out", () => {
+  const monday = new Date(2026, 9, 12, 12).getTime();
+  const map = drawStrip({ columns: lastWeeks(monday, WEEKS_SHOWN), totals: new Map([["2026-10-12", 50]]), today: "2026-10-12", color: "#f2a7c3" });
+  assert.equal(map.match(/<rect x=/g).length, 14 * 7);
+  assert.equal(map.match(/fill="#1a1e24"/g).length, 5);
+  assert.equal(map.match(/fill="#21262d"/g).length, 14 * 7 - 5 - 1);
+
+  // The five are Tuesday to Saturday of the last column.
+  const upcoming = [...map.matchAll(/<rect x="(\d+)" y="(\d+)"[^>]*fill="#1a1e24"/g)].map(m => [Number(m[1]), Number(m[2])]);
+  assert.deepEqual(upcoming, [[185, 30], [185, 44], [185, 58], [185, 72], [185, 86]]);
+});
+
+// Focus time can't be in the future, but a day past today must never be
+// shaded even if the file somehow says so.
+test("a day after today is upcoming whatever the totals say", () => {
+  const monday = new Date(2026, 9, 12, 12).getTime();
+  const map = drawStrip({ columns: lastWeeks(monday, WEEKS_SHOWN), totals: new Map([["2026-10-14", 300]]), today: "2026-10-12", color: "#f2a7c3" });
+  assert.doesNotMatch(map, /fill="#f2a7c3"/);
 });
 
 // Today's square is the bottom right one on a Saturday. If the grid

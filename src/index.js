@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
-import { History, lastWeeks } from "./history.js";
+import { History, dayOf, lastWeeks } from "./history.js";
 import { drawKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
 
 const NOTICE_MS = 2000;
@@ -224,6 +224,7 @@ class HeatMap extends SingletonAction {
       drawStrip({
         columns: lastWeeks(Date.now(), WEEKS_SHOWN),
         totals: history.totals(task),
+        today: dayOf(Date.now()),
         // All tasks together is always pink. One task is its own color.
         color: task ? history.colorOf(task) : PINK,
         notice: this.notices.get(target.id),

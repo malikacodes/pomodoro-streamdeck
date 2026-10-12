@@ -17,6 +17,11 @@ const BLACK = "#000000";
 // the faintest colored square.
 const EMPTY = "#21262d";
 
+// The rest of this week: days that haven't happened yet. One shade darker
+// than an empty day, also from my GitHub Graph dial, so I can tell "not
+// yet" from "nothing that day".
+const UPCOMING = "#1a1e24";
+
 // Task names are whatever I typed, and a < or an & would break the SVG.
 function safe(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -75,13 +80,14 @@ export function drawKey(face) {
 // 2px gap. 14 weeks of those is 194px, which leaves 3px on each side.
 export const WEEKS_SHOWN = 14;
 
-// view is { columns, totals, color, notice }:
+// view is { columns, totals, today, color, notice }:
 //   columns  weeks of days from lastWeeks in history.js
 //   totals   focus minutes per day, a Map of "2026-10-10" to minutes
+//   today    today as "2026-10-10". Days after it are drawn as upcoming.
 //   color    the color to shade with
 //   notice   a word to show for a moment in place of the map, like the
 //            name of the task I just turned to
-export function drawStrip({ columns, totals, color: picked, notice }) {
+export function drawStrip({ columns, totals, today, color: picked, notice }) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" font-family="${FONT}">`,
     `<rect width="200" height="100" fill="${BLACK}"/>`,
@@ -93,8 +99,9 @@ export function drawStrip({ columns, totals, color: picked, notice }) {
     const shades = ramp(picked);
     columns.forEach((week, w) => {
       week.forEach((day, slot) => {
-        if (!day) return;
-        parts.push(`<rect x="${3 + w * 14}" y="${2 + slot * 14}" width="12" height="12" rx="2" fill="${shades[level(totals.get(day))]}"/>`);
+        // Dates written this way sort like words, so > means "later".
+        const fill = day > today ? UPCOMING : shades[level(totals.get(day))];
+        parts.push(`<rect x="${3 + w * 14}" y="${2 + slot * 14}" width="12" height="12" rx="2" fill="${fill}"/>`);
       });
     });
   }
