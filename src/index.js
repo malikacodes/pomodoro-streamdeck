@@ -5,8 +5,8 @@ import { execFile } from "node:child_process";
 import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
-import { History, dayOf, lastWeeks } from "./history.js";
-import { drawKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
+import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
+import { drawKey, drawStatsKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
 
 const NOTICE_MS = 2000;
 
@@ -57,6 +57,14 @@ function colorFor(task) {
 // be a task's name. A name is trimmed before it's added, so it can never
 // be a lone star.
 const ALL = "*";
+
+// The task a dial's or a stats key's settings point at, or null for all
+// of them. One I've never touched has no setting, and that's all of
+// them too.
+function pickedTask(settings) {
+  const task = settings?.task;
+  return task && task !== ALL ? task : null;
+}
 
 // Tells the settings page that's open about the task list. Three
 // messages, because three things on the pages want it:
@@ -230,13 +238,13 @@ class HeatMap extends SingletonAction {
   lastImages = new Map();
 
   async onWillAppear(ev) {
-    this.showing.set(ev.action.id, this.pick(ev.payload.settings));
+    this.showing.set(ev.action.id, pickedTask(ev.payload.settings));
     await this.render(ev.action);
   }
 
   // I picked a task from the dropdown on the dial's settings page.
   async onDidReceiveSettings(ev) {
-    this.showing.set(ev.action.id, this.pick(ev.payload.settings));
+    this.showing.set(ev.action.id, pickedTask(ev.payload.settings));
     await this.render(ev.action);
   }
 
@@ -245,12 +253,6 @@ class HeatMap extends SingletonAction {
     sendTasks();
   }
 
-  // The task a dial's settings point at, or null for all of them. A
-  // dial I've never touched has no setting, and that's all of them too.
-  pick(settings) {
-    const task = settings?.task;
-    return task && task !== ALL ? task : null;
-  }
 
   onWillDisappear(ev) {
     this.showing.delete(ev.action.id);
@@ -318,14 +320,83 @@ class HeatMap extends SingletonAction {
   }
 }
 
+// How each stretch of time reads along the bottom of the stats key.
+// This year reads as the year itself, like on my GitHub stats key.
+function periodName(period, now) {
+  return { today: "Today", week: "This week", all: "All time" }[period] ?? String(new Date(now).getFullYear());
+}
+
+// A key that counts my sessions: rounds that ran to the end, for one
+// task or all of them, over today, this week, this year or all time.
+class StatsKey extends SingletonAction {
+  settings = new Map();
+  lastImages = new Map();
+
+  async onWillAppear(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  async onDidReceiveSettings(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  onWillDisappear(ev) {
+    this.settings.delete(ev.action.id);
+    this.lastImages.delete(ev.action.id);
+  }
+
+  // The settings page asking for the task list.
+  onSendToPlugin() {
+    sendTasks();
+  }
+
+  // The stretch of time a key counts over. A key I haven't set up counts
+  // this year, and anything odd in the setting does too.
+  period(settings) {
+    return PERIODS.includes(settings?.period) ? settings.period : "year";
+  }
+
+  // A press steps to the next stretch: today, this week, this year, all
+  // time, and round again. It's saved, so the settings page agrees and
+  // the key stays there after a restart.
+  async onKeyDown(ev) {
+    const settings = this.settings.get(ev.action.id) ?? {};
+    const next = PERIODS[(PERIODS.indexOf(this.period(settings)) + 1) % PERIODS.length];
+    this.settings.set(ev.action.id, { ...settings, period: next });
+    await ev.action.setSettings({ ...settings, period: next });
+    await this.render(ev.action);
+  }
+
+  async render(target) {
+    const settings = this.settings.get(target.id) ?? {};
+    const task = pickedTask(settings);
+    const period = this.period(settings);
+    const now = Date.now();
+    const image = asImage(
+      drawStatsKey({
+        label: task ?? "All tasks",
+        sessions: history.sessionCount(task, periodStart(period, now)),
+        period: periodName(period, now),
+        color: task ? colorFor(task) : PINK,
+      }),
+    );
+    if (this.lastImages.get(target.id) === image) return;
+    this.lastImages.set(target.id, image);
+    await target.setImage(image);
+  }
+}
+
 const timerKey = new (action({ UUID: "com.malikacodes.pomodoro.timer" })(TimerKey))();
+const statsKey = new (action({ UUID: "com.malikacodes.pomodoro.stats" })(StatsKey))();
 const heatMap = new (action({ UUID: "com.malikacodes.pomodoro.heatmap" })(HeatMap))();
 const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
 
 // Redraws every key and dial on the page. The "is it different" check in
 // each render keeps this cheap.
 function redraw() {
-  for (const owner of [timerKey, heatMap]) {
+  for (const owner of [timerKey, heatMap, statsKey]) {
     for (const target of owner.actions) {
       owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
     }
@@ -339,6 +410,7 @@ timer.restore(await history.loadRun());
 
 streamDeck.actions.registerAction(timerKey);
 streamDeck.actions.registerAction(heatMap);
+streamDeck.actions.registerAction(statsKey);
 
 // Once a second: see if the period has run out, then redraw. This keeps
 // going when none of it is on the page I'm looking at, so the sound

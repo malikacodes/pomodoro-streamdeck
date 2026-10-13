@@ -31,6 +31,21 @@ export function level(minutes) {
   return 1 + STEPS.filter(step => minutes >= step).length;
 }
 
+// The day each stretch on the stats key starts on. "week" starts on
+// Sunday, the same as a column of the heat map. "all" has no start.
+export const PERIODS = ["today", "week", "year", "all"];
+export function periodStart(period, now) {
+  const d = new Date(now);
+  d.setHours(12, 0, 0, 0);
+  if (period === "today") return dayOf(d.getTime());
+  if (period === "week") {
+    d.setDate(d.getDate() - d.getDay());
+    return dayOf(d.getTime());
+  }
+  if (period === "year") return `${d.getFullYear()}-01-01`;
+  return undefined;
+}
+
 // The last few weeks as columns for the map, oldest first. Each column is
 // a week, Sunday at the top, and each slot is a day like "2026-10-10".
 // The week I'm in is always all seven days, the ones that haven't
@@ -55,6 +70,16 @@ export function lastWeeks(now, count) {
 }
 
 const empty = () => ({ v: 1, sessions: [], colors: {} });
+
+// Whether a saved focus period counts as a session: a round that ran all
+// the way to the end. Newer ones say so themselves ("full" is true or
+// false). The ones saved before I kept track don't say either way, so
+// those count if they're at least 25 minutes, which is as short as a
+// focus round of mine gets.
+export const OLD_SESSION_MINUTES = 25;
+function counts(s) {
+  return s.full ?? s.minutes >= OLD_SESSION_MINUTES;
+}
 
 // A saved file is only trusted if it's the shape this file writes.
 // Anything else starts fresh rather than drawing nonsense.
@@ -86,9 +111,10 @@ export class History {
     }
   }
 
-  // Adds a finished focus session, filed under the day it ended.
-  add({ task, minutes }, now) {
-    this.data.sessions.push({ task, date: dayOf(now), minutes });
+  // Adds a finished focus session, filed under the day it ended. full is
+  // whether the round ran to the end (see "counts" above).
+  add({ task, minutes, full }, now) {
+    this.data.sessions.push({ task, date: dayOf(now), minutes, full: Boolean(full) });
     return this.#write("sessions.json", this.data);
   }
 
@@ -138,6 +164,15 @@ export class History {
       days.set(s.date, (days.get(s.date) ?? 0) + s.minutes);
     }
     return days;
+  }
+
+  // How many sessions, for one task or (with no task) all of them, on or
+  // after the day "from". With no from it's every one I've saved. Only a
+  // round that ran to the end is a session.
+  sessionCount(task, from) {
+    // Dates written like 2026-10-13 sort like words, so >= means "that
+    // day or later".
+    return this.data.sessions.filter(s => (!task || s.task === task) && (!from || s.date >= from) && counts(s)).length;
   }
 
   // The timer that's running right now, saved so a restart can pick it

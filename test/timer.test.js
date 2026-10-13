@@ -65,7 +65,7 @@ test("with auto start it runs focus, short, focus, long and starts over", () => 
   const t = new Timer();
   t.start({ ...mine, autoStart: true }, 0);
   let now = 45 * MIN;
-  assert.deepEqual(t.tick(now), { finished: "focus", session: { task: "Reading", minutes: 45 } });
+  assert.deepEqual(t.tick(now), { finished: "focus", session: { task: "Reading", minutes: 45, full: true } });
   assert.deepEqual([t.run.phase, t.run.round, t.run.running], ["short", 1, true]);
   now += 10 * MIN;
   assert.deepEqual(t.tick(now), { finished: "short", session: null });
@@ -111,13 +111,25 @@ test("skip saves the focus so far and starts the break", () => {
   assert.deepEqual([t.run.phase, t.run.round, t.run.running], ["focus", 2, true]);
 });
 
+// Only a round that ran out counts as a session on the stats key.
+// Leaving early, by Done or by skipping, keeps the minutes and nothing more.
+test("only a round that ran to the end is marked full", () => {
+  const t = new Timer();
+  t.start({ ...mine, autoStart: true }, 0);
+  assert.equal(t.skip(44 * MIN).session.full, undefined);
+  t.skip(45 * MIN);
+  assert.equal(t.tick(200 * MIN).session.full, true);
+  t.tick(400 * MIN);
+  assert.equal(t.done(430 * MIN).session.full, undefined);
+});
+
 // Interval timer off is one countdown: no break to skip to, and it ends
 // by itself.
 test("a plain countdown ignores skip and ends when it runs out", () => {
   const t = new Timer();
   t.start({ ...mine, intervals: false }, 0);
   assert.equal(t.skip(5 * MIN), null);
-  assert.deepEqual(t.tick(45 * MIN), { finished: "focus", session: { task: "Reading", minutes: 45 } });
+  assert.deepEqual(t.tick(45 * MIN), { finished: "focus", session: { task: "Reading", minutes: 45, full: true } });
   assert.equal(t.run, null);
 });
 

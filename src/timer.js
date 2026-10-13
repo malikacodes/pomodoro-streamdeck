@@ -126,11 +126,17 @@ export class Timer {
   // The session for the focus period I'm leaving, or null on a break or
   // when I'd barely started. The minutes are the period's length minus
   // what's left, which is why paused time can't sneak in.
+  //
+  // "full" marks a round that ran all the way to the end. Leaving early
+  // still saves the minutes, but only a full round counts as a session
+  // on the stats and goal keys.
   #closeFocus(now) {
     const run = this.run;
     if (run.phase !== "focus") return null;
-    const minutes = minutesOf(this.length() - this.timeLeft(now));
-    return minutes > 0 ? { task: run.task, minutes } : null;
+    const left = this.timeLeft(now);
+    const minutes = minutesOf(this.length() - left);
+    if (!(minutes > 0)) return null;
+    return left === 0 ? { task: run.task, minutes, full: true } : { task: run.task, minutes };
   }
 
   // What comes after the period I'm in: a short break after each focus

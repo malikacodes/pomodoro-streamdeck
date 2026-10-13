@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this key's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <!-- Whose sessions this key counts: one task, or all of them. The
+         list comes from the plugin ("getTasksOrAll"), and tasks are
+         added on a Timer key's settings page. -->
+    <sdpi-item label="Task">
+      <sdpi-select setting="task" datasource="getTasksOrAll" hot-reload placeholder="All tasks"></sdpi-select>
+    </sdpi-item>
+    <!-- The stretch of time it counts over. Pressing the key steps
+         through the same four, so this is only for picking one without
+         reaching for the deck. -->
+    <sdpi-item label="Count">
+      <sdpi-select setting="period" default="year">
+        <option value="today">Today</option>
+        <option value="week">This week</option>
+        <option value="year">This year</option>
+        <option value="all">All time</option>
+      </sdpi-select>
+    </sdpi-item>
+  </body>
+</html>

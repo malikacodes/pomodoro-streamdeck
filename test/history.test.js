@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { History, dataDir, dayOf, lastWeeks, level } from "../src/history.js";
+import { History, dataDir, dayOf, lastWeeks, level, periodStart } from "../src/history.js";
 
 // Every test gets its own empty folder, so none of them can see my real
 // history or each other's.
@@ -55,6 +55,53 @@ test("totals add up a day for one task or for all of them", async () => {
   assert.equal(h.totals("Cleaning").get("2026-10-10"), 20);
   assert.equal(h.totals().get("2026-10-10"), 77.5);
   assert.equal(h.totals("Cleaning").get("2026-10-09"), undefined);
+});
+
+// The stats key's number. A round I left early keeps its minutes but
+// isn't a session.
+test("only full rounds are counted as sessions", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  const today = at(2026, 10, 13);
+  h.add({ task: "Reading", minutes: 45, full: true }, today);
+  h.add({ task: "Reading", minutes: 44 }, today);
+  await h.add({ task: "Cleaning", minutes: 20, full: true }, today);
+  assert.equal(h.sessionCount(), 2);
+  assert.equal(h.sessionCount("Reading"), 1);
+  assert.equal(h.sessionCount("Nothing yet"), 0);
+  // The early one still made it onto the heat map.
+  assert.equal(h.totals("Reading").get("2026-10-13"), 89);
+});
+
+// Sessions saved before rounds were marked don't say if they were full.
+// Those count from 25 minutes up, so my first weeks aren't a row of zeros.
+test("an old session with no mark counts if it's 25 minutes or more", async () => {
+  const dir = await freshDir();
+  await writeFile(join(dir, "sessions.json"), JSON.stringify({ v: 1, colors: {}, sessions: [
+    { task: "Reading", date: "2026-10-10", minutes: 45 },
+    { task: "Reading", date: "2026-10-10", minutes: 25 },
+    { task: "Reading", date: "2026-10-10", minutes: 24.9 },
+    { task: "Reading", date: "2026-10-10", minutes: 60, full: false },
+  ] }));
+  const h = new History({ dir, logger: quiet });
+  await h.load();
+  assert.equal(h.sessionCount(), 2);
+});
+
+// The four stretches on the stats key. The edges are what matter:
+// yesterday isn't today, last Saturday isn't this week.
+test("sessions can be counted from today, this week or this year", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  // 2026-10-13 is a Tuesday, so this week started on Sunday the 11th.
+  const now = at(2026, 10, 13);
+  for (const day of [at(2025, 12, 31), at(2026, 1, 1), at(2026, 10, 10), at(2026, 10, 11), at(2026, 10, 12), now]) {
+    h.add({ task: "Reading", minutes: 45, full: true }, day);
+  }
+  await h.writing;
+  assert.equal(periodStart("today", now), "2026-10-13");
+  assert.equal(periodStart("week", now), "2026-10-11");
+  assert.equal(periodStart("year", now), "2026-01-01");
+  assert.equal(periodStart("all", now), undefined);
+  assert.deepEqual(["today", "week", "year", "all"].map(p => h.sessionCount(null, periodStart(p, now))), [1, 3, 5, 6]);
 });
 
 // The task list has to be there after a restart, colors included.

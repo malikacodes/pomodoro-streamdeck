@@ -75,6 +75,28 @@ export function drawKey(face) {
   return parts.join("");
 }
 
+// The stats key: the task on top, how many sessions in the middle, and
+// along the bottom which stretch of time that's for, with a dot in the
+// task's color. It's laid out like the Timer key so the two sit well
+// together.
+export function drawStatsKey({ label, sessions, period, color: picked }) {
+  const total = String(sessions);
+  // A longer number needs smaller digits to stay inside the key.
+  const size = total.length <= 2 ? 56 : total.length === 3 ? 46 : 36;
+
+  // The dot is a character inside the same line of text as the words,
+  // with its own color. That way the two are one piece, and centering
+  // the piece centers both without me guessing how wide the letters are.
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
+    `<rect width="144" height="144" fill="${BLACK}"/>`,
+    `<text x="72" y="38" fill="#8a8a90" font-size="20" font-weight="600" text-anchor="middle">${safe(short(label, 12))}</text>`,
+    `<text x="72" y="${74 + size / 3}" fill="#ffffff" font-size="${size}" font-weight="600" text-anchor="middle">${total}</text>`,
+    `<text x="72" y="126" fill="#8a8a90" font-size="18" font-weight="600" text-anchor="middle"><tspan fill="${color(picked)}">●</tspan> ${safe(period)}</text>`,
+    "</svg>",
+  ].join("");
+}
+
 // The strip above the dial, 200 by 100 pixels: the heat map, one square
 // a day. Seven rows have to fit in 100px, so the squares are 12px with a
 // 2px gap. 14 weeks of those is 194px, which leaves 3px on each side.

@@ -11,6 +11,7 @@ focused.
 |---|---|
 | ⏱ Timer | A key for one task. Tap to start, tap to pause, tap to carry on. Hold it for half a second for Done. Tap twice to jump to the break, or from a break back to focus. |
 | 🟪 Heat Map | A dial. One square per day for the last 14 weeks, brighter for more focus time. Turn it to flip between all tasks and each one. Tap the strip to go back to all. Press it to jump to the break. |
+| 🔢 Sessions | A key that counts my finished focus sessions, for one task or all of them. Press it to step through today, this week, this year and all time. |
 
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
 
@@ -25,6 +26,11 @@ and the name that shows for a moment when I turn to it.
 
 These pictures are drawn by the plugin's own drawing code, not
 photographed off the deck.
+
+![The Sessions key for all tasks and for single tasks](journal/assets/04-counting-sessions/key.png)
+
+The Sessions key: the task on top, the count, and which stretch of time
+it's counting. The dot is the task's color.
 
 ## The settings
 
@@ -46,6 +52,9 @@ Property Inspector, the panel at the bottom).
 
 To time a second thing, I drag another Timer key onto the deck and pick
 a different task, or add a new one right there.
+
+The Sessions key has two: Task (all tasks, or one from the list) and
+Count (today, this week, this year or all time).
 
 The Heat Map dial has one setting, Show: all tasks, or one task from
 the same list. Turning the dial changes the same thing.
@@ -85,6 +94,10 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
   a second longer, because the key has to wait and see if a second tap
   is coming. If that bothers me, the checkbox turns it off and the dial
   press still jumps to the break.
+- **A session is a round that ran to the end.** If I press Done or jump
+  to the break early, the minutes still go on the heat map, but it
+  isn't a session. Sessions saved before I kept track of that count if
+  they're 25 minutes or longer.
 - **The map's shades are in units of my sessions.** Under 45 minutes in
   a day is the faintest, then 45, 90, and 180 or more. They're in
   `STEPS` in `src/history.js`.
@@ -141,5 +154,5 @@ npm test
 
 They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
-restart, the task list, taps against double taps against holds, the day totals and
+restart, the task list, what counts as a session, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.

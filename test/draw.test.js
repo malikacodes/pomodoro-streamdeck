@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawKey, drawStrip, ramp, WEEKS_SHOWN } from "../src/draw.js";
+import { drawKey, drawStatsKey, drawStrip, ramp, WEEKS_SHOWN } from "../src/draw.js";
 import { lastWeeks } from "../src/history.js";
 
 const MIN = 60000;
@@ -11,6 +11,7 @@ const strip = more => drawStrip({ columns: lastWeeks(saturday, WEEKS_SHOWN), tot
 // The deck is pure black, so a lighter background shows as a gray square.
 test("the key and the strip are drawn on pure black", () => {
   assert.match(drawKey(face()), /<rect width="144" height="144" fill="#000000"\/>/);
+  assert.match(drawStatsKey({ label: "Reading", sessions: 3, period: "Today", color: "#88ccff" }), /<rect width="144" height="144" fill="#000000"\/>/);
   assert.match(strip(), /<rect width="200" height="100" fill="#000000"\/>/);
   assert.match(strip({ notice: "Reading" }), /<rect width="200" height="100" fill="#000000"\/>/);
 });
@@ -130,4 +131,26 @@ test("a notice replaces the map", () => {
   const named = strip({ notice: "Reading" });
   assert.match(named, />Reading</);
   assert.doesNotMatch(named, /<rect x=/);
+});
+
+// The stats key: the task, the count, and the dot in the task's color.
+test("the stats key shows the task, the sessions and a dot in the task's color", () => {
+  const key = drawStatsKey({ label: "Reading", sessions: 12, period: "This week", color: "#88ccff" });
+  assert.match(key, />Reading</);
+  assert.match(key, />12</);
+  assert.match(key, /<tspan fill="#88ccff">●<\/tspan> This week</);
+});
+
+// A year of sessions is a four digit number, and it has to shrink to fit.
+test("a long session count gets smaller digits", () => {
+  const size = n => Number(drawStatsKey({ label: "All tasks", sessions: n, period: "All time", color: "#f2a7c3" }).match(/font-size="(\d+)" font-weight="600" text-anchor="middle">\d+</)[1]);
+  assert.ok(size(7) > size(365) && size(365) > size(1200));
+  assert.ok(size(1200) >= 15);
+});
+
+// A task name with an & in it is the kind of thing that blanks a key.
+test("the stats key's task name and color can't break the picture", () => {
+  const key = drawStatsKey({ label: "R&D <x>", sessions: 1, period: "Today", color: '"><script>' });
+  assert.match(key, />R&amp;D &lt;x&gt;</);
+  assert.doesNotMatch(key, /script/);
 });

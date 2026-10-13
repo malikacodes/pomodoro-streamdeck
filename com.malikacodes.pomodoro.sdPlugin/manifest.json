@@ -41,6 +41,16 @@
         }
       },
       "States": [ { "Image": "imgs/key" } ]
+    },
+    {
+      "UUID": "com.malikacodes.pomodoro.stats",
+      "Name": "Sessions",
+      "Tooltip": "How many focus sessions I've finished, for one task or all of them. Press to step through today, this week, this year and all time.",
+      "Icon": "imgs/stats",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/stats.html",
+      "States": [ { "Image": "imgs/key" } ]
     }
   ]
 }
