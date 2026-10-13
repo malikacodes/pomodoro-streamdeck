@@ -15,7 +15,8 @@ focused.
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
 
 The key: waiting, counting, paused, and on a break. The dots are the
-rounds. White ones are finished and the gray one is the round I'm in.
+rounds. Finished ones are in the task's color and the gray one is the
+round I'm in.
 
 ![The heat map for all tasks, for one task, and the name that shows when I turn](journal/assets/01-a-timer-on-a-key/strip.png)
 

@@ -63,11 +63,11 @@ export function drawKey(face) {
     `<text x="72" y="88" fill="${fill}" font-size="38" font-weight="600" text-anchor="middle">${clock(face.ms)}</text>`,
   ];
 
-  // The dots: white for a round I've finished, gray for the one I'm in,
-  // nearly black for the ones to come. They're 16 apart and centered,
-  // so eight still fit.
+  // The dots: the task's color for a round I've finished, the same
+  // color its heat map uses. Gray for the round I'm in, nearly black for
+  // the ones to come. They're 16 apart and centered, so eight still fit.
   for (let i = 0; i < face.rounds; i++) {
-    const dot = i < face.done ? "#ffffff" : i + 1 === face.current ? "#8a8a90" : "#2c2c30";
+    const dot = i < face.done ? color(face.color) : i + 1 === face.current ? "#8a8a90" : "#2c2c30";
     parts.push(`<circle cx="${72 - (face.rounds - 1) * 8 + i * 16}" cy="120" r="4" fill="${dot}"/>`);
   }
 

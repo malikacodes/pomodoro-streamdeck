@@ -15,11 +15,13 @@ test("the key and the strip are drawn on pure black", () => {
   assert.match(strip({ notice: "Reading" }), /<rect width="200" height="100" fill="#000000"\/>/);
 });
 
-// One dot per round: finished ones white, the one I'm in gray.
-test("the key has a dot per round, white for the finished ones", () => {
+// One dot per round: finished ones in the task's color, so the dots and
+// that task's heat map match. The one I'm in is gray.
+test("the key has a dot per round, in the task's color for the finished ones", () => {
   const key = drawKey(face());
   assert.equal(key.match(/<circle/g).length, 4);
-  assert.equal(key.match(/<circle[^>]*fill="#ffffff"/g).length, 1);
+  assert.equal(key.match(/<circle[^>]*fill="#88ccff"/g).length, 1);
+  assert.doesNotMatch(key, /<circle[^>]*fill="#ffffff"/);
   assert.equal(key.match(/<circle[^>]*fill="#8a8a90"/g).length, 1);
   assert.equal(key.match(/<circle[^>]*fill="#2c2c30"/g).length, 2);
 });
@@ -30,6 +32,11 @@ test("eight dots stay inside the key", () => {
   assert.equal(xs.length, 8);
   assert.ok(Math.min(...xs) - 4 >= 0 && Math.max(...xs) + 4 <= 144);
   assert.equal(xs[0] + xs[7], 144);
+});
+
+// A color that isn't a hex color mustn't reach the dots either.
+test("a bad color gives pink dots", () => {
+  assert.equal(drawKey(face({ color: "nope", done: 2 })).match(/<circle[^>]*fill="#f2a7c3"/g).length, 2);
 });
 
 // A plain countdown has no rounds, so no dots.
