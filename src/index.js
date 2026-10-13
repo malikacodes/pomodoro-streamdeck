@@ -6,7 +6,7 @@ import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
-import { drawKey, drawStatsKey, drawStrip, short, WEEKS_SHOWN } from "./draw.js";
+import { drawKey, drawOpenKey, drawStatsKey, drawStrip, short, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
 import { drawGoalKey } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
 import { streaks } from "./streak.js";
@@ -64,12 +64,41 @@ function colorFor(task) {
 // be a lone star.
 const ALL = "*";
 
+// And "the task I tapped" needs one too. A key or dial set to this
+// shows whichever task I last tapped on a heat map dial, which is how
+// one task page can serve every task.
+const TAPPED = "@";
+
 // The task a dial's or a stats key's settings point at, or null for all
 // of them. One I've never touched has no setting, and that's all of
 // them too.
 function pickedTask(settings) {
   const task = settings?.task;
+  if (task === TAPPED) return history.tapped() ?? null;
   return task && task !== ALL ? task : null;
+}
+
+// The pages this plugin ships with, by the kind of deck they're laid out
+// for (Stream Deck's own numbers: 7 is the Stream Deck +, 2 is the XL).
+// A plugin can only open pages it ships with, never ones I made by hand.
+// The task page needs dials, so only the + has one.
+const PAGES = {
+  7: { main: "profiles/pomodoro-plus", task: "profiles/pomodoro-task-plus" },
+  2: { main: "profiles/pomodoro-xl" },
+};
+
+// Opens one of those pages on the deck the key or dial is on. The first
+// time, Stream Deck asks whether to install it. If this kind of deck
+// has no such page, the yellow triangle says so.
+async function openPage(target, which) {
+  const page = PAGES[target.device.type]?.[which];
+  if (!page) return target.showAlert();
+  try {
+    await streamDeck.profiles.switchToProfile(target.device.id, page);
+  } catch (error) {
+    streamDeck.logger.error(`Couldn't open ${page}: ${error.message}`);
+    await target.showAlert();
+  }
 }
 
 // Tells the settings page that's open about the task list. Three
@@ -81,8 +110,10 @@ function pickedTask(settings) {
 // The dropdowns have "hot-reload" on, so they fill in again whenever
 // their message arrives, not only when the page opens.
 function sendTasks(picked) {
-  const items = history.tasks().map(name => ({ value: name, label: name }));
+  const names = history.tasks().map(name => ({ value: name, label: name }));
   const colors = Object.fromEntries(history.tasks().map(name => [name, colorFor(name)]));
+  // The last row is for the keys and dials on the task page.
+  const items = [...names, { value: TAPPED, label: "The task I tapped" }];
   for (const message of [
     { event: "getTasks", items },
     { event: "getTasksOrAll", items: [{ value: ALL, label: "All tasks" }, ...items] },
@@ -142,7 +173,7 @@ class TimerKey extends SingletonAction {
     this.settings.set(ev.action.id, ev.payload.settings ?? {});
     await this.adopt(ev.action);
     // The page's color box follows the task I just picked.
-    sendTasks(plan(ev.payload.settings).task);
+    sendTasks(plan(this.settingsOf(ev.action.id)).task);
     redraw();
   }
 
@@ -152,6 +183,8 @@ class TimerKey extends SingletonAction {
   // Those get added once, with the color the key had.
   async adopt(target) {
     const settings = this.settings.get(target.id) ?? {};
+    // A key on the task page has no task of its own to add.
+    if (settings.name === TAPPED) return;
     const p = plan(settings);
     history.addTask(p.task, p.color);
     if (settings.name === p.task) return;
@@ -162,16 +195,24 @@ class TimerKey extends SingletonAction {
     await target.setSettings(next);
   }
 
+  // A key's settings as the timer should see them. A key on the task
+  // page says "the task I tapped" where the name goes, and this swaps
+  // in the real one. Its lengths are still its own.
+  settingsOf(id) {
+    const settings = this.settings.get(id) ?? {};
+    return settings.name === TAPPED ? { ...settings, name: history.tapped() } : settings;
+  }
+
   // Messages from the settings page: it asks for the list when it opens,
   // and tells me when I add a task or change a color.
   async onSendToPlugin(ev) {
     const asked = ev.payload ?? {};
-    const picked = plan(this.settings.get(ev.action.id)).task;
+    const picked = plan(this.settingsOf(ev.action.id)).task;
 
     if (asked.event === "addTask") {
       // 30 letters is more than the key can show anyway.
       const name = String(asked.name ?? "").trim().slice(0, 30);
-      if (!name || name === ALL) return sendStatus("Type a name first");
+      if (!name || name === ALL || name === TAPPED) return sendStatus("Type a name first");
       const added = history.addTask(name, PINK);
       // A new task needs no announcement: the dropdown switching to it
       // says it worked. Only the odd case gets words.
@@ -203,7 +244,7 @@ class TimerKey extends SingletonAction {
   // The key only reports down and up. presses.js turns those into a tap,
   // a double tap or a hold, and calls "pressed" below.
   onKeyDown(ev) {
-    presses.down(ev.action.id, plan(this.settings.get(ev.action.id)).doubleTap);
+    presses.down(ev.action.id, plan(this.settingsOf(ev.action.id)).doubleTap);
   }
 
   onKeyUp(ev) {
@@ -213,7 +254,7 @@ class TimerKey extends SingletonAction {
   pressed(id, kind) {
     const target = [...this.actions].find(each => each.id === id);
     if (!target) return;
-    const outcome = act(KEY_GESTURES[kind], this.settings.get(id) ?? {});
+    const outcome = act(KEY_GESTURES[kind], this.settingsOf(id));
 
     // The yellow triangle means "another task is running". The check
     // mark is for Done, so I know the hold landed.
@@ -225,9 +266,10 @@ class TimerKey extends SingletonAction {
     // Every setImage is a message to Stream Deck, so a picture only goes
     // out when it's different from the last one. Most seconds it is,
     // while a timer runs, and never while nothing does.
-    const face = timer.face(this.settings.get(target.id) ?? {}, Date.now());
+    const settings = this.settingsOf(target.id);
+    const face = timer.face(settings, Date.now());
     // The color belongs to the task now, not to the key.
-    face.color = colorFor(plan(this.settings.get(target.id)).task);
+    face.color = colorFor(plan(settings).task);
     const image = asImage(drawKey(face));
     if (this.lastImages.get(target.id) === image) return;
     this.lastImages.set(target.id, image);
@@ -236,21 +278,20 @@ class TimerKey extends SingletonAction {
 }
 
 class HeatMap extends SingletonAction {
-  // Per dial on screen: which task's map it's on (null is all of them),
-  // the word it's showing for a moment (if any), and the last picture
-  // sent to it.
-  showing = new Map();
+  // Per dial on screen: its settings, the word it's showing for a moment
+  // (if any), and the last picture sent to it.
+  settings = new Map();
   notices = new Map();
   lastImages = new Map();
 
   async onWillAppear(ev) {
-    this.showing.set(ev.action.id, pickedTask(ev.payload.settings));
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
     await this.render(ev.action);
   }
 
   // I picked a task from the dropdown on the dial's settings page.
   async onDidReceiveSettings(ev) {
-    this.showing.set(ev.action.id, pickedTask(ev.payload.settings));
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
     await this.render(ev.action);
   }
 
@@ -260,40 +301,69 @@ class HeatMap extends SingletonAction {
   }
 
   onWillDisappear(ev) {
-    this.showing.delete(ev.action.id);
+    this.settings.delete(ev.action.id);
     this.notices.delete(ev.action.id);
     this.lastImages.delete(ev.action.id);
   }
 
-  // Turning flips through All and then each task, and goes round at both
-  // ends. The name shows for a moment so I know which map I've landed on.
-  async onDialRotate(ev) {
-    const list = [null, ...history.tasks()];
-
-    const at = Math.max(0, list.indexOf(this.showing.get(ev.action.id) ?? null));
-    // JavaScript's % keeps the minus sign (-1 % 5 is -1), so I add the
-    // length back before taking it again.
-    const next = list[(((at + ev.payload.ticks) % list.length) + list.length) % list.length];
-    await this.show(ev.action, next);
+  // Whether this dial is one of the four on the task page, which all
+  // show the task I tapped.
+  onTaskPage(id) {
+    return this.settings.get(id)?.task === TAPPED;
   }
 
-  // Tapping the strip goes back to everything.
+  // Where a turn lands: ticks steps along the list from where I am, going
+  // round at both ends. JavaScript's % keeps the minus sign (-1 % 5 is
+  // -1), so I add the length back before taking it again.
+  step(list, current, ticks) {
+    const at = Math.max(0, list.indexOf(current));
+    return list[(((at + ticks) % list.length) + list.length) % list.length];
+  }
+
+  // Turning flips through All and then each task. The name shows for a
+  // moment so I know which map I've landed on. On the task page there's
+  // no All: turning any of the four dials moves the whole page to the
+  // next task.
+  async onDialRotate(ev) {
+    if (this.onTaskPage(ev.action.id)) {
+      const tasks = history.tasks();
+      if (tasks.length === 0) return;
+      const next = this.step(tasks, history.tapped(), ev.payload.ticks);
+      history.tap(next);
+      // The name goes across all four dials at once.
+      for (const dial of this.actions) {
+        if (this.onTaskPage(dial.id)) this.showNotice(dial, next).catch(() => {});
+      }
+      redraw();
+      return;
+    }
+
+    const next = this.step([null, ...history.tasks()], pickedTask(this.settings.get(ev.action.id)), ev.payload.ticks);
+    const settings = { ...this.settings.get(ev.action.id), task: next ?? ALL };
+    this.settings.set(ev.action.id, settings);
+    // Saved in the dial's settings so it's on the same map after a
+    // restart, and so the dropdown on its settings page agrees.
+    await ev.action.setSettings(settings);
+    await this.showNotice(ev.action, next ?? "All tasks");
+  }
+
+  // Tapping a task's map opens the task page for that task. Tapping on
+  // the task page goes back, so it's tap in, tap out.
   async onTouchTap(ev) {
-    await this.show(ev.action, null);
+    if (this.onTaskPage(ev.action.id)) return openPage(ev.action, "main");
+
+    const task = pickedTask(this.settings.get(ev.action.id));
+    // All tasks has no page of its own.
+    if (!task) return this.showNotice(ev.action, "Turn to a task");
+    history.tap(task);
+    redraw();
+    await openPage(ev.action, "task");
   }
 
   // Pressing the dial jumps to the break, or from a break back to focus,
   // for whichever task is running.
   async onDialDown(ev) {
     if (act(DIAL_PRESS, null) === "nothing") await this.showNotice(ev.action, "Nothing running");
-  }
-
-  async show(target, task) {
-    this.showing.set(target.id, task);
-    // Saved in the dial's settings so it's on the same map after a
-    // restart, and so the dropdown on its settings page agrees.
-    await target.setSettings({ task: task ?? ALL });
-    await this.showNotice(target, task ?? "All tasks");
   }
 
   async showNotice(target, text) {
@@ -308,20 +378,44 @@ class HeatMap extends SingletonAction {
   }
 
   async render(target) {
-    const task = this.showing.get(target.id) ?? null;
+    // No settings means the dial went away while a redraw was on its way.
+    const settings = this.settings.get(target.id);
+    if (!settings) return;
+
+    const task = pickedTask(settings);
+    // "wide" is the map across all four dials. Each dial draws the slice
+    // for the column it sits in.
+    const wide = settings.wide === true;
     const image = asImage(
       drawStrip({
-        columns: lastWeeks(Date.now(), WEEKS_SHOWN),
+        columns: lastWeeks(Date.now(), wide ? WEEKS_WIDE : WEEKS_SHOWN),
         totals: history.totals(task),
         today: dayOf(Date.now()),
         // All tasks together is always pink. One task is its own color.
         color: task ? colorFor(task) : PINK,
         notice: this.notices.get(target.id),
+        slot: wide ? (target.coordinates?.column ?? 0) : undefined,
       }),
     );
     if (this.lastImages.get(target.id) === image) return;
     this.lastImages.set(target.id, image);
     await target.setFeedback({ canvas: image });
+  }
+}
+
+// A key that opens my main Pomodoro page on the deck it's on. On the
+// task page it's the Back key. The word on it comes from its settings.
+class OpenKey extends SingletonAction {
+  async onWillAppear(ev) {
+    await ev.action.setImage(asImage(drawOpenKey(String(ev.payload.settings?.label || "Pomodoro"))));
+  }
+
+  async onDidReceiveSettings(ev) {
+    await ev.action.setImage(asImage(drawOpenKey(String(ev.payload.settings?.label || "Pomodoro"))));
+  }
+
+  async onKeyDown(ev) {
+    await openPage(ev.action, "main");
   }
 }
 
@@ -665,6 +759,7 @@ class StreakKey extends SingletonAction {
 }
 
 const timerKey = new (action({ UUID: "com.malikacodes.pomodoro.timer" })(TimerKey))();
+const openKey = new (action({ UUID: "com.malikacodes.pomodoro.open" })(OpenKey))();
 const streakKey = new (action({ UUID: "com.malikacodes.pomodoro.streak" })(StreakKey))();
 const goalKey = new (action({ UUID: "com.malikacodes.pomodoro.goal" })(GoalKey))();
 const statsKey = new (action({ UUID: "com.malikacodes.pomodoro.stats" })(StatsKey))();
@@ -695,6 +790,7 @@ timer.restore(await history.loadRun());
 
 streamDeck.actions.registerAction(timerKey);
 streamDeck.actions.registerAction(heatMap);
+streamDeck.actions.registerAction(openKey);
 streamDeck.actions.registerAction(statsKey);
 streamDeck.actions.registerAction(goalKey);
 streamDeck.actions.registerAction(streakKey);

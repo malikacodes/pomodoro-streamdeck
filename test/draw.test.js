@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawKey, drawStatsKey, drawStrip, ramp, short, WEEKS_SHOWN } from "../src/draw.js";
+import { drawKey, drawOpenKey, drawStatsKey, drawStrip, ramp, short, WEEKS_SHOWN, WEEKS_WIDE } from "../src/draw.js";
 import { lastWeeks } from "../src/history.js";
 
 const MIN = 60000;
@@ -161,4 +161,42 @@ test("a name is cut to the length asked for, and a short one is left alone", () 
   assert.equal(short("Organic Chemistry II", 14), "Organic Chemi…");
   assert.equal(short("Organic Chemistry II", 14).length, 14);
   assert.equal(short("593", 14), "593");
+});
+
+// The map across four dials is one 800px picture, and each dial shows a
+// 200px window of it. If the windows overlapped or left a gap, the
+// squares wouldn't line up from one dial to the next.
+test("the wide map gives each of the four dials its own quarter", () => {
+  const monday = new Date(2026, 9, 12, 12).getTime();
+  const view = slot => drawStrip({ columns: lastWeeks(monday, WEEKS_WIDE), totals: new Map(), today: "2026-10-12", color: "#f2a7c3", slot });
+  assert.deepEqual([0, 1, 2, 3].map(slot => view(slot).match(/viewBox="(\d+) 0 200 100"/)[1]), ["0", "200", "400", "600"]);
+  // Every dial still says it's 200 wide, and the black covers all 800.
+  assert.match(view(2), /width="200" height="100" viewBox/);
+  assert.match(view(2), /<rect width="800" height="100" fill="#000000"\/>/);
+});
+
+// 57 weeks have to fit the 800 pixels exactly, with today's week at the
+// right-hand end.
+test("the wide map's squares fill the strip and stay inside it", () => {
+  const saturday = new Date(2026, 9, 10, 12).getTime();
+  const map = drawStrip({ columns: lastWeeks(saturday, WEEKS_WIDE), totals: new Map(), today: "2026-10-10", color: "#f2a7c3", slot: 0 });
+  const xs = [...map.matchAll(/<rect x="(\d+)" y="(\d+)"/g)].map(m => Number(m[1]));
+  assert.equal(xs.length, 57 * 7);
+  assert.equal(Math.min(...xs), 2);
+  assert.equal(Math.max(...xs) + 12, 798);
+});
+
+// Turning the dials on the task page shows the task's name across the
+// whole strip, so it has to sit in the middle of the 800, not the 200.
+test("a notice on the wide map is centered across all four dials", () => {
+  const named = drawStrip({ columns: [], totals: new Map(), today: "2026-10-10", color: "#f2a7c3", notice: "R&D", slot: 1 });
+  assert.match(named, /<text x="400"[^>]*>R&amp;D</);
+  assert.doesNotMatch(named, /<rect x=/);
+});
+
+// The key that opens a page: on black, with its word safe to draw.
+test("the open key is on pure black and its word can't break the picture", () => {
+  const key = drawOpenKey("Back & <forth>");
+  assert.match(key, /<rect width="144" height="144" fill="#000000"\/>/);
+  assert.match(key, />Back &amp; &lt;for…</);
 });

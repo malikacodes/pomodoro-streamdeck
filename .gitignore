@@ -1,3 +1,7 @@
 node_modules/
 *.log
 logs/
+
+# Built by "npm run profiles" from my own task list and Home profiles.
+# They carry my decks' serial numbers, so they stay on this Mac.
+com.malikacodes.pomodoro.sdPlugin/profiles/

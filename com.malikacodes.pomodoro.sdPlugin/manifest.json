@@ -10,26 +10,43 @@
   "Icon": "imgs/plugin",
   "CategoryIcon": "imgs/timer",
   "Category": "Pomodoro",
-  "Nodejs": { "Version": "24" },
-  "Software": { "MinimumVersion": "7.1" },
-  "OS": [ { "Platform": "mac", "MinimumVersion": "13" } ],
+  "Nodejs": {
+    "Version": "24"
+  },
+  "Software": {
+    "MinimumVersion": "7.1"
+  },
+  "OS": [
+    {
+      "Platform": "mac",
+      "MinimumVersion": "13"
+    }
+  ],
   "Actions": [
     {
       "UUID": "com.malikacodes.pomodoro.timer",
       "Name": "Timer",
       "Tooltip": "Tap to start, pause or carry on. Hold to finish. Tap twice to jump to the break.",
       "Icon": "imgs/timer",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/timer.html",
-      "States": [ { "Image": "imgs/key" } ]
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
     },
     {
       "UUID": "com.malikacodes.pomodoro.heatmap",
       "Name": "Heat Map",
-      "Tooltip": "My focus time, one square a day. Turn to flip between all tasks and each one. Tap to go back to all. Press to jump to the break.",
+      "Tooltip": "My focus time, one square a day. Turn to flip between all tasks and each one. Tap a task's map to open its page. Press to jump to the break.",
       "Icon": "imgs/timer",
-      "Controllers": ["Encoder"],
+      "Controllers": [
+        "Encoder"
+      ],
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/heatmap.html",
       "Encoder": {
@@ -37,40 +54,101 @@
         "TriggerDescription": {
           "Rotate": "All tasks or one",
           "Push": "Jump to break",
-          "Touch": "Back to all"
+          "Touch": "Open that task's page"
         }
       },
-      "States": [ { "Image": "imgs/key" } ]
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
     },
     {
       "UUID": "com.malikacodes.pomodoro.stats",
       "Name": "Sessions",
       "Tooltip": "How many focus sessions I've finished, for one task or all of them. Press to step through today, this week, this year and all time.",
       "Icon": "imgs/stats",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/stats.html",
-      "States": [ { "Image": "imgs/key" } ]
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
     },
     {
       "UUID": "com.malikacodes.pomodoro.goal",
       "Name": "Daily Goal",
       "Tooltip": "A ring that fills up as today's focus sessions get closer to my goal, with a celebration when I get there. Press to play it again.",
       "Icon": "imgs/goal",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/goal.html",
-      "States": [ { "Image": "imgs/key" } ]
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
     },
     {
       "UUID": "com.malikacodes.pomodoro.streak",
       "Name": "Streak",
       "Tooltip": "How many days in a row I've focused, with a fire that grows as the streak does. Press to make it flare.",
       "Icon": "imgs/streak",
-      "Controllers": ["Keypad"],
+      "Controllers": [
+        "Keypad"
+      ],
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/streak.html",
-      "States": [ { "Image": "imgs/key" } ]
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
+    },
+    {
+      "UUID": "com.malikacodes.pomodoro.open",
+      "Name": "Open Pomodoro",
+      "Tooltip": "Opens my Pomodoro page on this deck. On the task page it's the way back.",
+      "Icon": "imgs/timer",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/open.html",
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
+    }
+  ],
+  "Profiles": [
+    {
+      "Name": "profiles/pomodoro-plus",
+      "DeviceType": 7,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/pomodoro-task-plus",
+      "DeviceType": 7,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
+    },
+    {
+      "Name": "profiles/pomodoro-xl",
+      "DeviceType": 2,
+      "Readonly": false,
+      "DontAutoSwitchWhenInstalled": true,
+      "AutoInstall": true
     }
   ]
 }

@@ -8,7 +8,8 @@
     "@elgato/streamdeck": "3.0.1"
   },
   "scripts": {
-    "check": "for f in src/*.js test/*.js; do node --check \"$f\" || exit 1; done",
-    "test": "node --test test/*.test.js"
+    "check": "for f in src/*.js test/*.js scripts/*.mjs com.malikacodes.pomodoro.sdPlugin/ui/*.js; do case \"$f\" in *sdpi-components.js) continue;; esac; node --check \"$f\" || exit 1; done",
+    "test": "node --test test/*.test.js",
+    "profiles": "node scripts/profiles.mjs"
   }
 }

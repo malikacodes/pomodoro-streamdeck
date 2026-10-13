@@ -118,6 +118,22 @@ test("the task list and its colors are still there after loading again", async (
   assert.equal(second.colorOf("Never heard of it"), undefined);
 });
 
+// The task page shows the task I last tapped, and it should still be
+// that one after a restart. A task that's gone from the list isn't it.
+test("the tapped task is remembered, and forgotten if it leaves the list", async () => {
+  const dir = await freshDir();
+  const first = new History({ dir, logger: quiet });
+  assert.equal(first.tapped(), undefined);
+  first.addTask("Reading", "#88ccff");
+  await first.tap("Reading");
+
+  const second = new History({ dir, logger: quiet });
+  await second.load();
+  assert.equal(second.tapped(), "Reading");
+  await second.tap("Never added");
+  assert.equal(second.tapped(), undefined);
+});
+
 // Adding a name twice must not wipe the color I already picked for it.
 test("adding a task that's already there changes nothing", async () => {
   const h = new History({ dir: await freshDir(), logger: quiet });

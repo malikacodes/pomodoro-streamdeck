@@ -10,10 +10,11 @@ focused.
 | Action | What it does |
 |---|---|
 | ⏱ Timer | A key for one task. Tap to start, tap to pause, tap to carry on. Hold it for half a second for Done. Tap twice to jump to the break, or from a break back to focus. |
-| 🟪 Heat Map | A dial. One square per day for the last 14 weeks, brighter for more focus time. Turn it to flip between all tasks and each one. Tap the strip to go back to all. Press it to jump to the break. |
+| 🟪 Heat Map | A dial. One square per day for the last 14 weeks, brighter for more focus time. Turn it to flip between all tasks and each one. Tap a task's map to open that task's page. Press it to jump to the break. |
 | 🔢 Sessions | A key that counts my finished focus sessions, for one task or all of them. Press it to step through today, this week, this year and all time. |
 | 🎯 Daily Goal | A key with a ring that fills as today's sessions get closer to my goal, and confetti the first time I get there. Once it's met, a press plays the confetti again. |
 | 🔥 Streak | A key with how many days in a row I've focused, and a fire that grows with it, from an ember to a bonfire. Press it to make the fire flare. |
+| ⏱ Open Pomodoro | A key that opens my main Pomodoro page on the deck it's on. On the task page it's the Back key. |
 
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
 
@@ -42,6 +43,30 @@ that's met. The ring is the task's color, or pink for all tasks.
 ![The Streak key from a cold coal to a bonfire, and a flare](journal/assets/06-a-fire-that-grows/key.png)
 
 The Streak key at 0, 3, 7, 40 and 120 days, and a 40 day fire flaring.
+
+## The pages
+
+The plugin comes with three pages (Stream Deck calls them profiles):
+
+| Page | Deck | What's on it |
+|---|---|---|
+| Pomodoro + | Stream Deck + | A Timer key and a Heat Map dial for each of my first three tasks, a fourth dial for all tasks, and Sessions, Daily Goal and Streak for all tasks |
+| Pomodoro Task + | Stream Deck + | One task's page: its Timer, Sessions, Daily Goal and Streak, a Back key, and its heat map stretched across all four dials (a year and a month) |
+| Pomodoro XL | XL | Everything at once: a row per task with Timer, Sessions, Daily Goal and Streak, and a row for all tasks |
+
+![The task page: four keys, the streak, and the map across the dials](journal/assets/08-a-page-for-one-task/task-page.png)
+
+The task page for one task, and the name that shows across the strip
+when I turn to another.
+
+Tapping a task's heat map on the + opens the task page for that task.
+There's only one task page. Everything on it is set to "the task I
+tapped", so it works for a task I add next week without building
+anything. On the task page, turning any dial moves to the next task,
+and tapping the strip goes back.
+
+The Home keys are crossed over on purpose: the one on the + sends my XL
+to its Home profile, and the one on the XL sends my + home.
 
 ## The settings
 
@@ -147,7 +172,19 @@ streamdeck link com.malikacodes.pomodoro.sdPlugin
 ```
 
 `streamdeck` is Elgato's CLI (`npm install -g @elgato/cli`). There's no
-build step. After changing the code:
+build step.
+
+The three pages are built from my own task list and my Home profiles,
+so they aren't in the repo:
+
+```bash
+npm run profiles
+```
+
+That writes them into the plugin folder. Stream Deck installs a page
+the first time a key or a tap opens it, and asks first. Run it again
+after adding a task, then remove the old page in Stream Deck's
+preferences so the new one can install. After changing the code:
 
 ```bash
 streamdeck restart com.malikacodes.pomodoro
@@ -167,6 +204,15 @@ Pomodoro in the action list.
   the controls again.
 - A new Timer key starts on a task called Focus.
 - Tasks are listed A to Z, on the dropdowns and when I turn the dial.
+- The pages hold my first three tasks. A fourth task still works
+  everywhere, it just has no column of its own until I make room.
+- On the task page, the Timer key uses its own lengths (45, 4 rounds,
+  10 and 15 unless I change them there), not the lengths on that task's
+  key on the main page.
+- A plugin can only open pages it ships with. That's why the Home keys
+  are Stream Deck's own Switch Profile action and not mine.
+- The profile files hold my decks' serial numbers, which is the other
+  reason they're ignored by git.
 - Changing a key's lengths while its timer is running takes effect the
   next time I start it, not mid round.
 - With auto start off, the next period shows as "Paused" until I tap.
@@ -194,5 +240,6 @@ They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
 restart, a round that ran out while the Mac slept, a timer that ends
 itself, the task list, what counts as a session, the goal ring and its celebration, the
-streak rules, the fire, the animation turns, taps against double taps against holds, the day totals and
+streak rules, the fire, the animation turns, the map across four dials,
+the page layouts, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.

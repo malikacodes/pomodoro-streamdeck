@@ -97,10 +97,28 @@ export function drawStatsKey({ label, sessions, period, color: picked }) {
   ].join("");
 }
 
+// A key that opens one of my Pomodoro pages: a small stopwatch in pink
+// and a word under it, like "Pomodoro" or "Back".
+export function drawOpenKey(label) {
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
+    `<rect width="144" height="144" fill="${BLACK}"/>`,
+    `<circle cx="72" cy="60" r="22" fill="none" stroke="${PINK}" stroke-width="5"/>`,
+    `<path d="M72 60V46M64 30h16" fill="none" stroke="${PINK}" stroke-width="5" stroke-linecap="round"/>`,
+    `<text x="72" y="118" fill="#ffffff" font-size="20" font-weight="600" text-anchor="middle">${safe(short(label, 12))}</text>`,
+    "</svg>",
+  ].join("");
+}
+
 // The strip above the dial, 200 by 100 pixels: the heat map, one square
 // a day. Seven rows have to fit in 100px, so the squares are 12px with a
 // 2px gap. 14 weeks of those is 194px, which leaves 3px on each side.
 export const WEEKS_SHOWN = 14;
+
+// The same map stretched across all four dials. The whole strip is 800
+// pixels, and 57 weeks of 12px squares with a 2px gap is 796, which
+// leaves 2px at each end. That's a year and a month.
+export const WEEKS_WIDE = 57;
 
 // view is { columns, totals, today, color, notice }:
 //   columns  weeks of days from lastWeeks in history.js
@@ -109,21 +127,33 @@ export const WEEKS_SHOWN = 14;
 //   color    the color to shade with
 //   notice   a word to show for a moment in place of the map, like the
 //            name of the task I just turned to
-export function drawStrip({ columns, totals, today, color: picked, notice }) {
+//   slot     only for the map across four dials: which dial this is,
+//            0 on the left to 3 on the right
+//
+// Across four dials, every dial draws the same 800px picture and then
+// looks at it through its own 200px window. viewBox is that window:
+// dial 0 shows pixels 0 to 200, dial 1 shows 200 to 400, and so on. Put
+// side by side they make one picture.
+export function drawStrip({ columns, totals, today, color: picked, notice, slot }) {
+  const wide = slot !== undefined;
+  const width = wide ? 800 : 200;
+  const left = wide ? 2 : 3;
   const parts = [
-    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="0 0 200 100" font-family="${FONT}">`,
-    `<rect width="200" height="100" fill="${BLACK}"/>`,
+    `<svg xmlns="http://www.w3.org/2000/svg" width="200" height="100" viewBox="${wide ? slot * 200 : 0} 0 200 100" font-family="${FONT}">`,
+    `<rect width="${width}" height="100" fill="${BLACK}"/>`,
   ];
 
   if (notice) {
-    parts.push(`<text x="100" y="57" fill="#ffffff" font-size="20" font-weight="600" text-anchor="middle">${safe(short(notice, 17))}</text>`);
+    // On the wide map the word sits in the middle of the whole strip,
+    // bigger, and each dial shows its slice of it.
+    parts.push(`<text x="${width / 2}" y="${wide ? 62 : 57}" fill="#ffffff" font-size="${wide ? 34 : 20}" font-weight="600" text-anchor="middle">${safe(short(notice, wide ? 30 : 17))}</text>`);
   } else {
     const shades = ramp(picked);
     columns.forEach((week, w) => {
-      week.forEach((day, slot) => {
+      week.forEach((day, row) => {
         // Dates written this way sort like words, so > means "later".
         const fill = day > today ? UPCOMING : shades[level(totals.get(day))];
-        parts.push(`<rect x="${3 + w * 14}" y="${2 + slot * 14}" width="12" height="12" rx="2" fill="${fill}"/>`);
+        parts.push(`<rect x="${left + w * 14}" y="${2 + row * 14}" width="12" height="12" rx="2" fill="${fill}"/>`);
       });
     });
   }

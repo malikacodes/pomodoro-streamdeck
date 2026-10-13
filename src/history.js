@@ -148,6 +148,20 @@ export class History {
     return this.hasTask(task) ? this.data.colors[task] : undefined;
   }
 
+  // The task I last tapped on a heat map dial. The task page's keys and
+  // dials all show this one. It's saved with the rest so the page is
+  // still on the same task after a restart. A task that has since left
+  // the list doesn't count.
+  tapped() {
+    return this.tasks().includes(this.data.tapped) ? this.data.tapped : undefined;
+  }
+
+  tap(name) {
+    if (this.data.tapped === name) return;
+    this.data.tapped = name;
+    return this.#write("sessions.json", this.data);
+  }
+
   // Every task, in the order a person would sort them: A to Z, and
   // "CIT 593" before "CIT 5930". A task with saved focus time counts
   // even if it never made it onto the list.
