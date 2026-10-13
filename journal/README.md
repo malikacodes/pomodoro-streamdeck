@@ -11,3 +11,4 @@ second.
 | 02 | 2026-10-12 | [The hole on Mondays](02-the-hole-on-mondays.md) |
 | 03 | 2026-10-13 | [One list of tasks](03-one-list-of-tasks.md) |
 | 04 | 2026-10-13 | [Counting sessions](04-counting-sessions.md) |
+| 05 | 2026-10-13 | [A ring for today](05-a-ring-for-today.md) |
