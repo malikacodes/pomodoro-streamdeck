@@ -9,3 +9,4 @@ second.
 |---|---|---|
 | 01 | 2026-10-10 | [A timer on a key](01-a-timer-on-a-key.md) |
 | 02 | 2026-10-12 | [The hole on Mondays](02-the-hole-on-mondays.md) |
+| 03 | 2026-10-13 | [One list of tasks](03-one-list-of-tasks.md) |
