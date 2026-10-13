@@ -5,6 +5,12 @@
 const MINUTE = 60000;
 export const PINK = "#f2a7c3";
 
+// A timer that has sat paused for this long ends itself. That covers a
+// pause I never came back from, and a next round that waited for a tap
+// that never came. Without it, a forgotten timer would hold on to the
+// whole plugin, because only one task runs at a time.
+export const GIVE_UP_MS = 60 * MINUTE;
+
 // A key's settings, cleaned up. They're saved as text ("45"), and a
 // setting I've never touched isn't saved at all, so everything here has
 // a fallback. Those fallbacks are my usual: 45 minute focus, 4 rounds,
@@ -47,6 +53,7 @@ function minutesOf(ms) {
 //   running       false while paused
 //   endsAt        when this period runs out, as a clock time
 //   left          how much was left when I paused
+//   pausedAt      when it stopped counting, as a clock time
 //
 // It keeps the time the period ends and not a count of seconds. A count
 // drifts if a tick is late, and it's gone if the plugin restarts. A clock
@@ -84,22 +91,46 @@ export class Timer {
     if (run.running) {
       run.left = this.timeLeft(now);
       run.running = false;
+      run.pausedAt = now;
     } else {
       run.endsAt = now + run.left;
       run.running = true;
+      delete run.pausedAt;
     }
   }
 
   // Called every second. When the period has run out it moves to the next
   // one and says which kind just finished, so the deck can make a sound.
   // If it was focus, the session to save comes back too.
+  //
+  // "at" is the moment it really happened, which isn't always now. If
+  // the Mac was asleep when a round ran out, the first tick after it
+  // wakes is hours late, and the session still belongs to the time the
+  // round ended. A 45 minute round started at 11pm is last night's.
   tick(now) {
     const run = this.run;
-    if (!run || !run.running || now < run.endsAt) return null;
+    if (!run) return null;
+
+    if (!run.running) {
+      // A timer saved before pausedAt existed starts its hour now.
+      run.pausedAt ??= now;
+      if (now - run.pausedAt < GIVE_UP_MS) return null;
+
+      // Paused for an hour. It ends the way Done would have at the
+      // moment I walked away: the focus minutes up to the pause are
+      // saved, and it isn't a full round.
+      const at = run.pausedAt;
+      const session = this.#closeFocus(now);
+      this.run = null;
+      return { finished: null, session, at };
+    }
+
+    if (now < run.endsAt) return null;
     const finished = run.phase;
+    const at = run.endsAt;
     const session = this.#closeFocus(now);
-    this.#advance(now, run.plan.autoStart);
-    return { finished, session };
+    this.#advance(now, run.plan.autoStart, at);
+    return { finished, session, at };
   }
 
   // Jump to the break now, or from a break straight back to focus. The
@@ -142,7 +173,7 @@ export class Timer {
   // What comes after the period I'm in: a short break after each focus
   // round, the long one after the last round, and after the long break a
   // fresh cycle from round 1. A plain countdown just ends.
-  #advance(now, go) {
+  #advance(now, go, at = now) {
     const run = this.run;
     if (!run.plan.intervals) {
       this.run = null;
@@ -159,6 +190,10 @@ export class Timer {
     run.running = go;
     run.left = go ? 0 : this.length();
     run.endsAt = go ? now + this.length() : 0;
+    // Waiting for a tap is a pause too, and its hour starts when the
+    // last period ended.
+    if (go) delete run.pausedAt;
+    else run.pausedAt = at;
   }
 
   // What a key should show: its own timer if its task is the one running,

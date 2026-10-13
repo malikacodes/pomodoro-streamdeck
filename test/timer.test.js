@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { Timer, plan, clock, PINK } from "../src/timer.js";
+import { Timer, plan, clock, PINK, GIVE_UP_MS } from "../src/timer.js";
 
 const MIN = 60000;
 const mine = { name: "Reading", focus: "45", rounds: "2", shortBreak: "10", longBreak: "15" };
@@ -65,10 +65,10 @@ test("with auto start it runs focus, short, focus, long and starts over", () => 
   const t = new Timer();
   t.start({ ...mine, autoStart: true }, 0);
   let now = 45 * MIN;
-  assert.deepEqual(t.tick(now), { finished: "focus", session: { task: "Reading", minutes: 45, full: true } });
+  assert.deepEqual(t.tick(now), { finished: "focus", session: { task: "Reading", minutes: 45, full: true }, at: now });
   assert.deepEqual([t.run.phase, t.run.round, t.run.running], ["short", 1, true]);
   now += 10 * MIN;
-  assert.deepEqual(t.tick(now), { finished: "short", session: null });
+  assert.deepEqual(t.tick(now), { finished: "short", session: null, at: now });
   assert.deepEqual([t.run.phase, t.run.round], ["focus", 2]);
   now += 45 * MIN;
   t.tick(now);
@@ -129,7 +129,7 @@ test("a plain countdown ignores skip and ends when it runs out", () => {
   const t = new Timer();
   t.start({ ...mine, intervals: false }, 0);
   assert.equal(t.skip(5 * MIN), null);
-  assert.deepEqual(t.tick(45 * MIN), { finished: "focus", session: { task: "Reading", minutes: 45, full: true } });
+  assert.deepEqual(t.tick(45 * MIN), { finished: "focus", session: { task: "Reading", minutes: 45, full: true }, at: 45 * MIN });
   assert.equal(t.run, null);
 });
 
@@ -177,6 +177,76 @@ test("a saved timer in the wrong shape is ignored", () => {
   assert.equal(t.restore({ task: "Reading", phase: "nap" }), false);
   assert.equal(t.restore(null), false);
   assert.equal(t.run, null);
+});
+
+// The Mac was asleep when the round ran out. The session belongs to the
+// time it ended, not to the morning I opened the lid.
+test("a round that ran out while nothing was ticking is dated when it ended", () => {
+  const t = new Timer();
+  t.start(mine, 0);
+  const late = t.tick(10 * 60 * MIN);
+  assert.equal(late.at, 45 * MIN);
+  assert.deepEqual(late.session, { task: "Reading", minutes: 45, full: true });
+});
+
+// A pause I never came back from. After an hour it ends like Done would
+// have: the minutes up to the pause, not a full round, dated at the pause.
+test("a timer paused for an hour ends itself and keeps the focus so far", () => {
+  const t = new Timer();
+  t.start(mine, 0);
+  t.toggle(20 * MIN);
+  assert.equal(t.tick(20 * MIN + GIVE_UP_MS - 1), null);
+  assert.deepEqual(t.tick(20 * MIN + GIVE_UP_MS), { finished: null, session: { task: "Reading", minutes: 20 }, at: 20 * MIN });
+  assert.equal(t.run, null);
+});
+
+// Coming back inside the hour and carrying on has to wipe the slate, or
+// a later pause would be cut short by the first one.
+test("carrying on starts the hour over", () => {
+  const t = new Timer();
+  t.start(mine, 0);
+  t.toggle(10 * MIN);
+  t.toggle(60 * MIN);
+  t.toggle(65 * MIN);
+  assert.equal(t.tick(65 * MIN + GIVE_UP_MS - 1), null);
+  assert.equal(t.tick(65 * MIN + GIVE_UP_MS).session.minutes, 15);
+});
+
+// Auto start off: the break is loaded and waits for a tap. If the tap
+// never comes, that's a forgotten timer too, and the hour counts from
+// when the focus round ended.
+test("a next round nobody starts ends itself an hour after the last one ended", () => {
+  const t = new Timer();
+  t.start(mine, 0);
+  t.tick(50 * MIN);
+  assert.deepEqual([t.run.phase, t.run.running], ["short", false]);
+  assert.equal(t.tick(45 * MIN + GIVE_UP_MS - 1), null);
+  // Nothing to save: the focus round was already filed when it ended.
+  assert.deepEqual(t.tick(45 * MIN + GIVE_UP_MS), { finished: null, session: null, at: 45 * MIN });
+  assert.equal(t.run, null);
+});
+
+// A timer that is counting is never given up on, however long it runs.
+test("a running timer doesn't end itself", () => {
+  const t = new Timer();
+  t.start({ ...mine, focus: "180" }, 0);
+  assert.equal(t.tick(179 * MIN), null);
+  assert.notEqual(t.run, null);
+});
+
+// A paused timer saved by the version before this one has no pause
+// time. Its hour starts when it's first looked at, not at "never".
+test("a paused timer with no pause time on it gets an hour from now", () => {
+  const before = new Timer();
+  before.start(mine, 0);
+  before.toggle(5 * MIN);
+  const saved = JSON.parse(JSON.stringify(before.run));
+  delete saved.pausedAt;
+
+  const t = new Timer();
+  t.restore(saved);
+  assert.equal(t.tick(900 * MIN), null);
+  assert.equal(t.tick(900 * MIN + GIVE_UP_MS).at, 900 * MIN);
 });
 
 // Rounds up, so the key shows 45:00 for the first second and 00:01 for

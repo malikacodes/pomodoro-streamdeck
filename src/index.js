@@ -48,7 +48,9 @@ function announce(task, finished) {
 // here: a finished focus session goes into the history, and the timer as
 // it stands now is saved in case the plugin restarts.
 function keep(result, now) {
-  if (result?.session) history.add(result.session, now);
+  // A session is filed under the moment it really ended, when the timer
+  // knows that better than the clock does (see "tick" in timer.js).
+  if (result?.session) history.add(result.session, result.at ?? now);
   history.saveRun(timer.run);
 }
 
@@ -706,7 +708,8 @@ setInterval(() => {
   const result = timer.tick(now);
   if (result) {
     keep(result, now);
-    announce(task, result.finished);
+    // A timer that gave up after an hour paused ends quietly.
+    if (result.finished) announce(task, result.finished);
   }
   redraw();
 }, 1000);

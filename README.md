@@ -112,6 +112,10 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
 - **One timer at a time.** If one task is running, another task's key
   shows Stream Deck's yellow warning triangle and does nothing. I didn't
   want a stray press on the wrong key to end a session.
+- **A forgotten timer lets go after an hour.** Only one task runs at a
+  time, so a timer I paused and walked away from would block every
+  other key until I found it. The hour is `GIVE_UP_MS` in
+  `src/timer.js`.
 - **Done saves what I actually did.** Hold the key 20 minutes into a 45
   and 20 minutes are saved. Paused time and break time never count.
 - **Double tap is on trial.** With it on, a single tap takes a third of
@@ -170,8 +174,14 @@ Pomodoro in the action list.
   break from the dial won't work there. The double tap still does.
 - A plain countdown (interval timer off) has no break to jump to, so
   the double tap and the dial press do nothing on it.
-- If the plugin was off when a period ran out, the sound plays when it
-  comes back, and the next period starts from then.
+- If my Mac was asleep (or the plugin was off) when a period ran out,
+  the sound plays when it comes back and the next period starts from
+  then. The session is filed under the time the round really ended, so
+  a round that ran out at 11:45pm stays on that day.
+- A timer that sits paused for an hour ends itself. That goes for a
+  pause I forgot, and for a next round that waited an hour for a tap.
+  The focus minutes up to the pause are saved. A timer that's counting
+  never ends itself.
 - There's no undo after Done yet.
 
 ## Tests
@@ -182,6 +192,7 @@ npm test
 
 They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
-restart, the task list, what counts as a session, the goal ring and its celebration, the
+restart, a round that ran out while the Mac slept, a timer that ends
+itself, the task list, what counts as a session, the goal ring and its celebration, the
 streak rules, the fire, the animation turns, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.
