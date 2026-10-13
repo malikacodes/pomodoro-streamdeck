@@ -14,3 +14,4 @@ second.
 | 05 | 2026-10-13 | [A ring for today](05-a-ring-for-today.md) |
 | 06 | 2026-10-13 | [A fire that grows](06-a-fire-that-grows.md) |
 | 07 | 2026-10-13 | [The timer I forgot about](07-the-timer-i-forgot-about.md) |
+| 08 | 2026-10-13 | [A page for one task](08-a-page-for-one-task.md) |
