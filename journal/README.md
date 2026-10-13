@@ -13,3 +13,4 @@ second.
 | 04 | 2026-10-13 | [Counting sessions](04-counting-sessions.md) |
 | 05 | 2026-10-13 | [A ring for today](05-a-ring-for-today.md) |
 | 06 | 2026-10-13 | [A fire that grows](06-a-fire-that-grows.md) |
+| 07 | 2026-10-13 | [The timer I forgot about](07-the-timer-i-forgot-about.md) |
