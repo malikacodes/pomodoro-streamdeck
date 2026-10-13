@@ -6,7 +6,7 @@ import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
-import { drawKey, drawStatsKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
+import { drawKey, drawStatsKey, drawStrip, short, WEEKS_SHOWN } from "./draw.js";
 import { drawGoalKey } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
 import { streaks } from "./streak.js";
@@ -257,7 +257,6 @@ class HeatMap extends SingletonAction {
     sendTasks();
   }
 
-
   onWillDisappear(ev) {
     this.showing.delete(ev.action.id);
     this.notices.delete(ev.action.id);
@@ -374,7 +373,11 @@ class StatsKey extends SingletonAction {
   }
 
   async render(target) {
-    const settings = this.settings.get(target.id) ?? {};
+    // No settings means the key went away while a redraw was on its way
+    // to it. Drawing it now would put it back in the maps for good.
+    const settings = this.settings.get(target.id);
+    if (!settings) return;
+
     const task = pickedTask(settings);
     const period = this.period(settings);
     const now = Date.now();
@@ -451,6 +454,12 @@ class GoalKey extends SingletonAction {
   sessionsToday(settings) {
     const now = Date.now();
     return history.sessionCount(pickedTask(settings), periodStart("today", now));
+  }
+
+  // Whether animate.js is sending this key's pictures right now. The
+  // once-a-second redraw leaves a moving key alone (see "redraw").
+  moving(id) {
+    return this.started.has(id);
   }
 
   // If today's goal is already met, a press plays the celebration again,
@@ -564,6 +573,12 @@ class StreakKey extends SingletonAction {
     sendTasks();
   }
 
+  // A lit fire is always moving: flaring, or swaying. A cold coal isn't,
+  // so the once-a-second redraw is what notices its first day.
+  moving(id) {
+    return this.flared.has(id) || this.counts.get(id) > 0;
+  }
+
   // If there's a fire, a press makes it flare. A cold coal has nothing
   // to flare, so there a press does nothing.
   async onKeyDown(ev) {
@@ -620,8 +635,9 @@ class StreakKey extends SingletonAction {
     const burst = flared === undefined ? undefined : (now - flared) / BURST_MS;
     const sway = (now % SWAY_MS) / SWAY_MS;
 
-    // The small line says which task, when it's only one.
-    const image = asImage(drawStreakKey(current, task ?? "", "#8a8a90", tier, burst, sway));
+    // The small line says which task, when it's only one. A long name
+    // is cut so it stays inside the key.
+    const image = asImage(drawStreakKey(current, task ? short(task, 14) : "", "#8a8a90", tier, burst, sway));
     const same = this.lastImages.get(target.id) === image;
     this.lastImages.set(target.id, image);
     if (!same) await target.setImage(image);
@@ -655,9 +671,16 @@ const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
 
 // Redraws every key and dial on the page. The "is it different" check in
 // each render keeps this cheap.
+//
+// A key that's in the middle of moving is skipped. Its picture changes
+// with the clock, so it would never be "the same as last time", and
+// every redraw would be one more picture on top of the ten a second
+// that animate.js is already handing out. It isn't left behind: its
+// next turn works everything out fresh, new sessions included.
 function redraw() {
   for (const owner of [timerKey, heatMap, statsKey, goalKey, streakKey]) {
     for (const target of owner.actions) {
+      if (owner.moving?.(target.id)) continue;
       owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
     }
   }

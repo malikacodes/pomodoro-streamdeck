@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawKey, drawStatsKey, drawStrip, ramp, WEEKS_SHOWN } from "../src/draw.js";
+import { drawKey, drawStatsKey, drawStrip, ramp, short, WEEKS_SHOWN } from "../src/draw.js";
 import { lastWeeks } from "../src/history.js";
 
 const MIN = 60000;
@@ -153,4 +153,12 @@ test("the stats key's task name and color can't break the picture", () => {
   const key = drawStatsKey({ label: "R&D <x>", sessions: 1, period: "Today", color: '"><script>' });
   assert.match(key, />R&amp;D &lt;x&gt;</);
   assert.doesNotMatch(key, /script/);
+});
+
+// The streak key's small line is a task name, and 30 letters at that
+// size would run off both sides of the key.
+test("a name is cut to the length asked for, and a short one is left alone", () => {
+  assert.equal(short("Organic Chemistry II", 14), "Organic Chemi…");
+  assert.equal(short("Organic Chemistry II", 14).length, 14);
+  assert.equal(short("593", 14), "593");
 });

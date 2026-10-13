@@ -27,7 +27,7 @@ function safe(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-function short(name, most) {
+export function short(name, most) {
   return name.length > most ? name.slice(0, most - 1).trimEnd() + "…" : name;
 }
 

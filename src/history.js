@@ -76,7 +76,7 @@ const empty = () => ({ v: 1, sessions: [], colors: {} });
 // false). The ones saved before I kept track don't say either way, so
 // those count if they're at least 25 minutes, which is as short as a
 // focus round of mine gets.
-export const OLD_SESSION_MINUTES = 25;
+const OLD_SESSION_MINUTES = 25;
 function counts(s) {
   return s.full ?? s.minutes >= OLD_SESSION_MINUTES;
 }
