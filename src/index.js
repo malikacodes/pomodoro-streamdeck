@@ -7,6 +7,8 @@ import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
 import { drawKey, drawStatsKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
+import { drawGoalKey } from "./goal.js";
+import { animate, stopAnimating } from "./animate.js";
 
 const NOTICE_MS = 2000;
 
@@ -388,7 +390,135 @@ class StatsKey extends SingletonAction {
   }
 }
 
+// How long the goal key's celebration lasts. Its pictures go through
+// animate.js, which keeps the whole plugin inside Elgato's limit of ten
+// pictures a second.
+const CELEBRATION_MS = 2200;
+
+// A key with a ring that fills up as today's sessions get closer to my
+// goal for the day, and a celebration the first time it's met. Once
+// it's met, a press plays the celebration again.
+class GoalKey extends SingletonAction {
+  settings = new Map();
+  lastImages = new Map();
+
+  // The keys that are in the middle of celebrating, and the time on the
+  // clock when each one started. How far along a key is gets worked out
+  // from that every time it's drawn, like checking a stopwatch, so the
+  // celebration takes the same 2.2 seconds however many pictures make
+  // it to the key.
+  started = new Map();
+
+  async onWillAppear(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  // Fires when I pick a different task or goal on the settings page.
+  // Only those two are taken from it. The page keeps its own copy of the
+  // settings, and if that copy is older than today's celebration, taking
+  // all of it would make the key forget it already celebrated.
+  async onDidReceiveSettings(ev) {
+    const { task, goal } = ev.payload.settings ?? {};
+    this.settings.set(ev.action.id, { ...this.settings.get(ev.action.id), task, goal });
+    await this.render(ev.action);
+  }
+
+  onWillDisappear(ev) {
+    // A celebration that gets cut off isn't picked up later. It already
+    // counted as today's, so the key comes back as the finished ring.
+    this.settings.delete(ev.action.id);
+    this.lastImages.delete(ev.action.id);
+    this.started.delete(ev.action.id);
+    stopAnimating(ev.action.id);
+  }
+
+  // The settings page asking for the task list.
+  onSendToPlugin() {
+    sendTasks();
+  }
+
+  // The settings page shows 4 before anything is picked, but it doesn't
+  // save that until I change it, so a new key arrives with no goal at
+  // all. Whatever does arrive is turned into a whole number from 1 to 12.
+  goal(settings) {
+    const goal = Math.round(Number(settings?.goal ?? 4));
+    return Math.min(12, Math.max(1, goal || 4));
+  }
+
+  sessionsToday(settings) {
+    const now = Date.now();
+    return history.sessionCount(pickedTask(settings), periodStart("today", now));
+  }
+
+  // If today's goal is already met, a press plays the celebration again,
+  // because that's fun to watch twice. Pressing in the middle of one
+  // starts it over.
+  async onKeyDown(ev) {
+    const settings = this.settings.get(ev.action.id);
+    if (!settings || this.sessionsToday(settings) < this.goal(settings)) return;
+    this.celebrate(ev.action);
+    await this.render(ev.action);
+  }
+
+  // The one place a key gets its picture from, whether that's the normal
+  // ring or a moment of the celebration.
+  async render(target) {
+    // No settings means the key went away while a redraw was on its way
+    // to it. Drawing it now would put it back in the maps for good.
+    const settings = this.settings.get(target.id);
+    if (!settings) return;
+
+    const now = Date.now();
+    const today = dayOf(now);
+    const goal = this.goal(settings);
+    const count = this.sessionsToday(settings);
+    const task = pickedTask(settings);
+
+    // The goal was just met and this key hasn't celebrated today. The
+    // date is saved right now and not when the animation ends, so
+    // switching pages or restarting halfway can't make it play again.
+    const starting = count >= goal && settings.celebrated !== today;
+    if (starting) {
+      this.settings.set(target.id, { ...settings, celebrated: today });
+      this.celebrate(target);
+    }
+
+    // How far through the celebration this key is, from 0 to 1.
+    const began = this.started.get(target.id);
+    const burst = began === undefined ? undefined : (now - began) / CELEBRATION_MS;
+
+    // Past the goal the ring just stays full, and the count keeps going.
+    const image = asImage(drawGoalKey(count, `of ${goal}`, "#8a8a90", Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
+    const same = this.lastImages.get(target.id) === image;
+    this.lastImages.set(target.id, image);
+
+    if (starting) await target.setSettings({ ...settings, celebrated: today });
+    if (!same) await target.setImage(image);
+  }
+
+  // Starts a key's stopwatch and puts it in the queue for animation
+  // turns. A key that's already celebrating just gets a new start time.
+  celebrate(target) {
+    this.started.set(target.id, Date.now());
+    animate(target.id, () => this.turn(target));
+  }
+
+  // Runs each time it's this key's turn to send a picture. When time's
+  // up the key comes out of the queue before it's drawn, so this same
+  // call is what puts the normal ring back.
+  turn(target) {
+    const began = this.started.get(target.id);
+    if (began === undefined || Date.now() - began >= CELEBRATION_MS) {
+      this.started.delete(target.id);
+      stopAnimating(target.id);
+    }
+    this.render(target).catch(() => {});
+  }
+}
+
 const timerKey = new (action({ UUID: "com.malikacodes.pomodoro.timer" })(TimerKey))();
+const goalKey = new (action({ UUID: "com.malikacodes.pomodoro.goal" })(GoalKey))();
 const statsKey = new (action({ UUID: "com.malikacodes.pomodoro.stats" })(StatsKey))();
 const heatMap = new (action({ UUID: "com.malikacodes.pomodoro.heatmap" })(HeatMap))();
 const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
@@ -396,7 +526,7 @@ const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
 // Redraws every key and dial on the page. The "is it different" check in
 // each render keeps this cheap.
 function redraw() {
-  for (const owner of [timerKey, heatMap, statsKey]) {
+  for (const owner of [timerKey, heatMap, statsKey, goalKey]) {
     for (const target of owner.actions) {
       owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
     }
@@ -411,6 +541,7 @@ timer.restore(await history.loadRun());
 streamDeck.actions.registerAction(timerKey);
 streamDeck.actions.registerAction(heatMap);
 streamDeck.actions.registerAction(statsKey);
+streamDeck.actions.registerAction(goalKey);
 
 // Once a second: see if the period has run out, then redraw. This keeps
 // going when none of it is on the page I'm looking at, so the sound

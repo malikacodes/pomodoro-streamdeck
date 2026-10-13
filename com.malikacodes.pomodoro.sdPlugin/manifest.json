@@ -51,6 +51,16 @@
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/stats.html",
       "States": [ { "Image": "imgs/key" } ]
+    },
+    {
+      "UUID": "com.malikacodes.pomodoro.goal",
+      "Name": "Daily Goal",
+      "Tooltip": "A ring that fills up as today's focus sessions get closer to my goal, with a celebration when I get there. Press to play it again.",
+      "Icon": "imgs/goal",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/goal.html",
+      "States": [ { "Image": "imgs/key" } ]
     }
   ]
 }

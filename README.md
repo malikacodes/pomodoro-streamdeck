@@ -12,6 +12,7 @@ focused.
 | ⏱ Timer | A key for one task. Tap to start, tap to pause, tap to carry on. Hold it for half a second for Done. Tap twice to jump to the break, or from a break back to focus. |
 | 🟪 Heat Map | A dial. One square per day for the last 14 weeks, brighter for more focus time. Turn it to flip between all tasks and each one. Tap the strip to go back to all. Press it to jump to the break. |
 | 🔢 Sessions | A key that counts my finished focus sessions, for one task or all of them. Press it to step through today, this week, this year and all time. |
+| 🎯 Daily Goal | A key with a ring that fills as today's sessions get closer to my goal, and confetti the first time I get there. Once it's met, a press plays the confetti again. |
 
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
 
@@ -31,6 +32,11 @@ photographed off the deck.
 
 The Sessions key: the task on top, the count, and which stretch of time
 it's counting. The dot is the task's color.
+
+![The Daily Goal key part way, celebrating, and met](journal/assets/05-a-ring-for-today/key.png)
+
+The Daily Goal key: one of four done, the celebration, and a goal
+that's met. The ring is the task's color, or pink for all tasks.
 
 ## The settings
 
@@ -56,6 +62,9 @@ a different task, or add a new one right there.
 The Sessions key has two: Task (all tasks, or one from the list) and
 Count (today, this week, this year or all time).
 
+The Daily Goal key has two: Task, and Daily goal (1 to 12 sessions,
+4 until I change it).
+
 The Heat Map dial has one setting, Show: all tasks, or one task from
 the same list. Turning the dial changes the same thing.
 
@@ -78,7 +87,11 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
   only reports "down" and "up".
 - `history.js` saves each finished focus session and adds them up per
   day for the map. It keeps the task list too.
-- `draw.js` makes the pictures as SVG text.
+- `draw.js` makes the pictures as SVG text. `goal.js` draws the Daily
+  Goal key's ring and confetti.
+- `animate.js` is one shared metronome for anything that moves. Stream
+  Deck takes about ten pictures a second, and that's a budget for the
+  whole plugin, so animated keys take turns.
 - `index.js` is the only file that talks to Stream Deck. The table at
   the top of it says which gesture does what, so changing one is a one
   line edit.
@@ -154,5 +167,6 @@ npm test
 
 They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
-restart, the task list, what counts as a session, taps against double taps against holds, the day totals and
+restart, the task list, what counts as a session, the goal ring and its celebration, the
+animation turns, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.
