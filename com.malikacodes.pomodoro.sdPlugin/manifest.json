@@ -61,6 +61,16 @@
       "UserTitleEnabled": false,
       "PropertyInspectorPath": "ui/goal.html",
       "States": [ { "Image": "imgs/key" } ]
+    },
+    {
+      "UUID": "com.malikacodes.pomodoro.streak",
+      "Name": "Streak",
+      "Tooltip": "How many days in a row I've focused, with a fire that grows as the streak does. Press to make it flare.",
+      "Icon": "imgs/streak",
+      "Controllers": ["Keypad"],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/streak.html",
+      "States": [ { "Image": "imgs/key" } ]
     }
   ]
 }

@@ -8,7 +8,9 @@ import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
 import { drawKey, drawStatsKey, drawStrip, WEEKS_SHOWN } from "./draw.js";
 import { drawGoalKey } from "./goal.js";
-import { animate, stopAnimating } from "./animate.js";
+import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
+import { streaks } from "./streak.js";
+import { SWAY_MS, TIERS, drawStreakKey } from "./flames.js";
 
 const NOTICE_MS = 2000;
 
@@ -517,7 +519,135 @@ class GoalKey extends SingletonAction {
   }
 }
 
+// The burst is the fire flaring up and throwing sparks. The rest of the
+// time a lit fire sways a little so the key doesn't look frozen.
+const BURST_MS = 2000;
+
+// A key with a fire that grows as my streak does, and the streak as a
+// number. A day counts if it has any focus time on it. Pressing the key
+// makes the fire flare up.
+class StreakKey extends SingletonAction {
+  settings = new Map();
+  lastImages = new Map();
+
+  // The streak each key showed last. A different number is what sets
+  // off a burst, and a key that isn't in here yet has only just appeared.
+  counts = new Map();
+
+  // The keys in the middle of a burst, and the time on the clock when
+  // each one started, like the goal key's celebration.
+  flared = new Map();
+
+  async onWillAppear(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  async onDidReceiveSettings(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  onWillDisappear(ev) {
+    // Its streak is forgotten too, which is what makes the fire flare
+    // up when the key comes back.
+    this.settings.delete(ev.action.id);
+    this.lastImages.delete(ev.action.id);
+    this.counts.delete(ev.action.id);
+    this.flared.delete(ev.action.id);
+    stopAnimating(ev.action.id);
+    stopIdling(ev.action.id);
+  }
+
+  // The settings page asking for the task list.
+  onSendToPlugin() {
+    sendTasks();
+  }
+
+  // If there's a fire, a press makes it flare. A cold coal has nothing
+  // to flare, so there a press does nothing.
+  async onKeyDown(ev) {
+    if (!this.counts.get(ev.action.id)) return;
+    this.flare(ev.action);
+    await this.render(ev.action);
+  }
+
+  // The settings page shows Daily and 1 before anything is picked, but
+  // it doesn't save them until I change them, so a new key arrives with
+  // no settings at all. Whatever does arrive is checked.
+  mode(settings) {
+    return settings.mode === "weekdays" || settings.mode === "weekly" ? settings.mode : "daily";
+  }
+
+  // 0 is a real choice here (no grace at all), so the default of 1 is
+  // only for a value that's missing or isn't a number.
+  grace(settings) {
+    const grace = Number(settings.graceDays ?? 1);
+    return Number.isNaN(grace) ? 1 : Math.min(3, Math.max(0, Math.round(grace)));
+  }
+
+  // The one place a key gets its picture from, whether the fire is
+  // cold, swaying or flaring.
+  async render(target) {
+    // No settings means the key went away while a redraw was on its way.
+    const settings = this.settings.get(target.id);
+    if (!settings) return;
+
+    const now = Date.now();
+    const task = pickedTask(settings);
+    const mode = this.mode(settings);
+    const { current } = streaks(history.totals(task), dayOf(now), mode, this.grace(settings));
+
+    // A new number gets a burst. That covers a key that has just
+    // appeared too, because it has no last number yet. 0 never bursts.
+    if (current > 0 && current !== this.counts.get(target.id)) this.flare(target);
+    this.counts.set(target.id, current);
+
+    // A lit fire that isn't in a burst sways, so it's in the idling line
+    // for as long as it's showing. A cold coal has nothing to sway.
+    if (current > 0 && !this.flared.has(target.id)) idle(target.id, () => this.render(target).catch(() => {}));
+    else stopIdling(target.id);
+
+    // The tier is how many rows of the table the streak has reached. A
+    // week counts as 7 days, so a weekly streak grows the same fire.
+    const days = mode === "weekly" ? current * 7 : current;
+    const tier = TIERS.filter(row => days >= row.from).length;
+
+    // How far through its burst this key is, from 0 to 1. The sway has
+    // no start of its own. It's read straight off the clock, like
+    // looking at where the second hand is.
+    const flared = this.flared.get(target.id);
+    const burst = flared === undefined ? undefined : (now - flared) / BURST_MS;
+    const sway = (now % SWAY_MS) / SWAY_MS;
+
+    // The small line says which task, when it's only one.
+    const image = asImage(drawStreakKey(current, task ?? "", "#8a8a90", tier, burst, sway));
+    const same = this.lastImages.get(target.id) === image;
+    this.lastImages.set(target.id, image);
+    if (!same) await target.setImage(image);
+  }
+
+  // Starts a key's burst stopwatch and puts it in the queue for
+  // animation turns.
+  flare(target) {
+    this.flared.set(target.id, Date.now());
+    animate(target.id, () => this.turn(target));
+  }
+
+  // Runs each time it's this key's turn to send a picture of its burst.
+  // When time's up the key comes out of the queue before it's drawn, so
+  // this same call is what sends it back to swaying.
+  turn(target) {
+    if (Date.now() - (this.flared.get(target.id) ?? 0) >= BURST_MS) {
+      this.flared.delete(target.id);
+      stopAnimating(target.id);
+    }
+    this.render(target).catch(() => {});
+  }
+}
+
 const timerKey = new (action({ UUID: "com.malikacodes.pomodoro.timer" })(TimerKey))();
+const streakKey = new (action({ UUID: "com.malikacodes.pomodoro.streak" })(StreakKey))();
 const goalKey = new (action({ UUID: "com.malikacodes.pomodoro.goal" })(GoalKey))();
 const statsKey = new (action({ UUID: "com.malikacodes.pomodoro.stats" })(StatsKey))();
 const heatMap = new (action({ UUID: "com.malikacodes.pomodoro.heatmap" })(HeatMap))();
@@ -526,7 +656,7 @@ const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
 // Redraws every key and dial on the page. The "is it different" check in
 // each render keeps this cheap.
 function redraw() {
-  for (const owner of [timerKey, heatMap, statsKey, goalKey]) {
+  for (const owner of [timerKey, heatMap, statsKey, goalKey, streakKey]) {
     for (const target of owner.actions) {
       owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
     }
@@ -542,6 +672,7 @@ streamDeck.actions.registerAction(timerKey);
 streamDeck.actions.registerAction(heatMap);
 streamDeck.actions.registerAction(statsKey);
 streamDeck.actions.registerAction(goalKey);
+streamDeck.actions.registerAction(streakKey);
 
 // Once a second: see if the period has run out, then redraw. This keeps
 // going when none of it is on the page I'm looking at, so the sound

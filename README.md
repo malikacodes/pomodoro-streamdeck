@@ -13,6 +13,7 @@ focused.
 | 🟪 Heat Map | A dial. One square per day for the last 14 weeks, brighter for more focus time. Turn it to flip between all tasks and each one. Tap the strip to go back to all. Press it to jump to the break. |
 | 🔢 Sessions | A key that counts my finished focus sessions, for one task or all of them. Press it to step through today, this week, this year and all time. |
 | 🎯 Daily Goal | A key with a ring that fills as today's sessions get closer to my goal, and confetti the first time I get there. Once it's met, a press plays the confetti again. |
+| 🔥 Streak | A key with how many days in a row I've focused, and a fire that grows with it, from an ember to a bonfire. Press it to make the fire flare. |
 
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
 
@@ -37,6 +38,10 @@ it's counting. The dot is the task's color.
 
 The Daily Goal key: one of four done, the celebration, and a goal
 that's met. The ring is the task's color, or pink for all tasks.
+
+![The Streak key from a cold coal to a bonfire, and a flare](journal/assets/06-a-fire-that-grows/key.png)
+
+The Streak key at 0, 3, 7, 40 and 120 days, and a 40 day fire flaring.
 
 ## The settings
 
@@ -65,6 +70,10 @@ Count (today, this week, this year or all time).
 The Daily Goal key has two: Task, and Daily goal (1 to 12 sessions,
 4 until I change it).
 
+The Streak key has three: Task, Streak mode (daily, weekdays only, or
+weekly) and Grace days (how many missed days in a row a streak
+survives, 0 to 3, 1 until I change it).
+
 The Heat Map dial has one setting, Show: all tasks, or one task from
 the same list. Turning the dial changes the same thing.
 
@@ -89,6 +98,8 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
   day for the map. It keeps the task list too.
 - `draw.js` makes the pictures as SVG text. `goal.js` draws the Daily
   Goal key's ring and confetti.
+- `streak.js` works out the streak from the day totals, and
+  `flames.js` draws the fire.
 - `animate.js` is one shared metronome for anything that moves. Stream
   Deck takes about ten pictures a second, and that's a budget for the
   whole plugin, so animated keys take turns.
@@ -111,6 +122,10 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
   to the break early, the minutes still go on the heat map, but it
   isn't a session. Sessions saved before I kept track of that count if
   they're 25 minutes or longer.
+- **A streak day is any day with focus time.** It doesn't have to be a
+  full session, and today can't break a streak, because today isn't
+  over. The fire has eight sizes: it changes at 1, 3, 7, 14, 30, 60,
+  120 and 365 days, and a weekly streak counts a week as 7.
 - **The map's shades are in units of my sessions.** Under 45 minutes in
   a day is the faintest, then 45, 90, and 180 or more. They're in
   `STEPS` in `src/history.js`.
@@ -168,5 +183,5 @@ npm test
 They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
 restart, the task list, what counts as a session, the goal ring and its celebration, the
-animation turns, taps against double taps against holds, the day totals and
+streak rules, the fire, the animation turns, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.

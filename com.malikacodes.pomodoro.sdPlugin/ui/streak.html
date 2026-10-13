@@ -1,0 +1,41 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this key's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <!-- Whose streak this is: one task, or all of them together. A day
+         counts if it has any focus time on it for that task. -->
+    <sdpi-item label="Task">
+      <sdpi-select setting="task" datasource="getTasksOrAll" hot-reload placeholder="All tasks"></sdpi-select>
+    </sdpi-item>
+
+    <!-- Two streak keys can count two different ways, like one daily
+         and one weekly. What's shown at first (Daily, 1) is only what
+         the page displays. Nothing is saved until I pick something, so
+         the plugin also treats a missing mode as daily and missing grace
+         days as 1. -->
+    <sdpi-item label="Streak mode">
+      <sdpi-radio setting="mode" default="daily">
+        <option value="daily">Daily</option>
+        <option value="weekdays">Weekdays only</option>
+        <option value="weekly">Weekly</option>
+      </sdpi-radio>
+    </sdpi-item>
+
+    <!-- A grace day is a missed day the streak is allowed to survive:
+         with 1, one day off doesn't end it, but two in a row do. Missed
+         days never add to the count, and weekly mode doesn't use them. -->
+    <sdpi-item label="Grace days">
+      <sdpi-select setting="graceDays" value-type="number" default="1">
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+      </sdpi-select>
+    </sdpi-item>
+  </body>
+</html>
