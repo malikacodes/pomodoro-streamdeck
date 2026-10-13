@@ -38,7 +38,7 @@ test("sessions are still there after loading the file again", async () => {
 
   const second = new History({ dir, logger: quiet });
   await second.load();
-  assert.deepEqual(second.tasks(), ["Reading", "Cleaning"]);
+  assert.deepEqual(second.tasks(), ["Cleaning", "Reading"]);
   assert.equal(second.totals().get("2026-10-10"), 20);
 });
 
@@ -57,28 +57,55 @@ test("totals add up a day for one task or for all of them", async () => {
   assert.equal(h.totals("Cleaning").get("2026-10-09"), undefined);
 });
 
-// A task's color has to outlive its key.
-test("a task's color is remembered in the file", async () => {
+// The task list has to be there after a restart, colors included.
+test("the task list and its colors are still there after loading again", async () => {
   const dir = await freshDir();
   const first = new History({ dir, logger: quiet });
-  first.add({ task: "Reading", minutes: 45 }, at(2026, 10, 10));
-  await first.remember("Reading", "#88ccff");
+  assert.equal(first.addTask("Reading", "#88ccff"), true);
+  await first.setColor("Reading", "#aabbcc");
 
   const second = new History({ dir, logger: quiet });
   await second.load();
-  assert.equal(second.colorOf("Reading"), "#88ccff");
+  assert.deepEqual(second.tasks(), ["Reading"]);
+  assert.equal(second.colorOf("Reading"), "#aabbcc");
   assert.equal(second.colorOf("Never heard of it"), undefined);
 });
 
-// The settings box sends the name after every letter, so "5" and "59"
-// turn up on the way to "593". Only a task with focus time keeps a color.
-test("a name with no focus time doesn't get a color saved", async () => {
+// Adding a name twice must not wipe the color I already picked for it.
+test("adding a task that's already there changes nothing", async () => {
   const h = new History({ dir: await freshDir(), logger: quiet });
-  h.remember("5", "#88ccff");
-  h.remember("59", "#88ccff");
-  await h.add({ task: "593", minutes: 45 }, at(2026, 10, 10));
-  await h.remember("593", "#88ccff");
-  assert.deepEqual(h.data.colors, { 593: "#88ccff" });
+  h.addTask("Reading", "#88ccff");
+  assert.equal(h.addTask("Reading", "#f2a7c3"), false);
+  assert.equal(h.colorOf("Reading"), "#88ccff");
+});
+
+// A color only sticks to a task that's on the list. This is what keeps
+// stray names out of the file.
+test("a color for a task that isn't on the list is ignored", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  await h.setColor("Typo", "#88ccff");
+  assert.deepEqual(h.tasks(), []);
+});
+
+// Every JavaScript object already has a "constructor" and a "toString".
+// A task with one of those names is still a new task.
+test("a task can be called constructor", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  assert.equal(h.colorOf("constructor"), undefined);
+  assert.equal(h.addTask("constructor", "#88ccff"), true);
+  assert.equal(h.colorOf("constructor"), "#88ccff");
+});
+
+// The order of the dropdown and of the dial. Numbers sort as numbers, so
+// 594 comes before 5930, and old focus time under a name that was never
+// added still shows up.
+test("tasks come back sorted, with ones that only have focus time", async () => {
+  const h = new History({ dir: await freshDir(), logger: quiet });
+  h.addTask("CIT 5930", "#f2a7c3");
+  h.addTask("cleaning", "#f2a7c3");
+  h.addTask("CIT 594", "#f2a7c3");
+  await h.add({ task: "Baking", minutes: 20 }, at(2026, 10, 10));
+  assert.deepEqual(h.tasks(), ["Baking", "CIT 594", "CIT 5930", "cleaning"]);
 });
 
 // A file that got mangled starts me fresh and doesn't crash the plugin.

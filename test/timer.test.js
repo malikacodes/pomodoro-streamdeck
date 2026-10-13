@@ -167,14 +167,6 @@ test("a saved timer in the wrong shape is ignored", () => {
   assert.equal(t.run, null);
 });
 
-// Renaming a running task on its key mustn't strand the timer.
-test("renaming a running task keeps its key in charge", () => {
-  const t = new Timer();
-  t.start(mine, 0);
-  t.rename("Reading", "Research");
-  assert.equal(t.owns({ ...mine, name: "Research" }), true);
-});
-
 // Rounds up, so the key shows 45:00 for the first second and 00:01 for
 // the last, never 00:00 while it's still going.
 test("the clock reads like a kitchen timer", () => {

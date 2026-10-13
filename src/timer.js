@@ -198,12 +198,6 @@ export class Timer {
     if (ok) this.run = saved;
     return Boolean(ok);
   }
-
-  // If I rename a task on its key while it's running, the timer follows
-  // the new name. Otherwise no key would own it and I couldn't stop it.
-  rename(from, to) {
-    if (this.run && this.run.task === from) this.run.task = to;
-  }
 }
 
 // 2700000 to "45:00". Past 99 minutes it just keeps counting: "120:00".

@@ -43,12 +43,43 @@ function announce(task, finished) {
 // Whatever the timer hands back after a command or a tick gets filed
 // here: a finished focus session goes into the history, and the timer as
 // it stands now is saved in case the plugin restarts.
-function keep(result, now, color) {
-  if (result?.session) {
-    history.add(result.session, now);
-    history.remember(result.session.task, color);
-  }
+function keep(result, now) {
+  if (result?.session) history.add(result.session, now);
   history.saveRun(timer.run);
+}
+
+// A task's color, or pink for one that never got a color.
+function colorFor(task) {
+  return history.colorOf(task) ?? PINK;
+}
+
+// On the heat map dial's dropdown, "All tasks" needs a value that can't
+// be a task's name. A name is trimmed before it's added, so it can never
+// be a lone star.
+const ALL = "*";
+
+// Tells the settings page that's open about the task list. Three
+// messages, because three things on the pages want it:
+//   getTasks       the rows for the Timer key's dropdown
+//   getTasksOrAll  the same with "All tasks" on top, for the dial
+//   tasks          each task's color, and which task this key is on, so
+//                  the color box can show the right one
+// The dropdowns have "hot-reload" on, so they fill in again whenever
+// their message arrives, not only when the page opens.
+function sendTasks(picked) {
+  const items = history.tasks().map(name => ({ value: name, label: name }));
+  const colors = Object.fromEntries(history.tasks().map(name => [name, colorFor(name)]));
+  for (const message of [
+    { event: "getTasks", items },
+    { event: "getTasksOrAll", items: [{ value: ALL, label: "All tasks" }, ...items] },
+    { event: "tasks", colors, picked },
+  ]) {
+    streamDeck.ui.sendToPropertyInspector(message).catch(() => {});
+  }
+}
+
+function sendStatus(text) {
+  streamDeck.ui.sendToPropertyInspector({ event: "status", text }).catch(() => {});
 }
 
 // Runs one command. settings is the key's settings, or null from the
@@ -60,8 +91,6 @@ function keep(result, now, color) {
 //   "nothing"  there was nothing to do
 function act(command, settings, now = Date.now()) {
   const mine = settings === null || timer.owns(settings);
-  // Read before the command runs, because Done clears the timer.
-  const color = timer.run?.color;
   let outcome = "ok";
 
   if (!timer.run) {
@@ -74,9 +103,9 @@ function act(command, settings, now = Date.now()) {
     timer.toggle(now);
     keep(null, now);
   } else if (command === "skip") {
-    keep(timer.skip(now), now, color);
+    keep(timer.skip(now), now);
   } else if (command === "done") {
-    keep(timer.done(now), now, color);
+    keep(timer.done(now), now);
     outcome = "done";
   }
 
@@ -90,25 +119,65 @@ class TimerKey extends SingletonAction {
 
   async onWillAppear(ev) {
     this.settings.set(ev.action.id, ev.payload.settings ?? {});
-    this.remember(ev.action.id);
+    await this.adopt(ev.action);
     await this.render(ev.action);
   }
 
+  // Fires when I change something on this key's settings page.
   async onDidReceiveSettings(ev) {
-    const before = plan(this.settings.get(ev.action.id)).task;
     this.settings.set(ev.action.id, ev.payload.settings ?? {});
-
-    // Renaming a task that's running: the timer keeps going under the
-    // new name, so this key can still pause and finish it.
-    const next = plan(ev.payload.settings);
-    timer.rename(before, next.task);
-    // A new color mid-timer goes with the session when it's saved.
-    if (timer.owns(ev.payload.settings)) timer.run.color = next.color;
-    history.saveRun(timer.run);
-
-    this.remember(ev.action.id);
-    // The dials too, in case the color changed.
+    await this.adopt(ev.action);
+    // The page's color box follows the task I just picked.
+    sendTasks(plan(ev.payload.settings).task);
     redraw();
+  }
+
+  // Makes sure this key's task is on the list. Two kinds of key need it:
+  // a brand new one, which starts out on "Focus", and one from before
+  // the list existed, whose name and color were typed into the key.
+  // Those get added once, with the color the key had.
+  async adopt(target) {
+    const settings = this.settings.get(target.id) ?? {};
+    const p = plan(settings);
+    history.addTask(p.task, p.color);
+    if (settings.name === p.task) return;
+
+    // Saved back so the dropdown shows the task and not "Pick a task".
+    const next = { ...settings, name: p.task };
+    this.settings.set(target.id, next);
+    await target.setSettings(next);
+  }
+
+  // Messages from the settings page: it asks for the list when it opens,
+  // and tells me when I add a task or change a color.
+  async onSendToPlugin(ev) {
+    const asked = ev.payload ?? {};
+    const picked = plan(this.settings.get(ev.action.id)).task;
+
+    if (asked.event === "addTask") {
+      // 30 letters is more than the key can show anyway.
+      const name = String(asked.name ?? "").trim().slice(0, 30);
+      if (!name || name === ALL) return sendStatus("Type a name first");
+      const added = history.addTask(name, PINK);
+      // A new task needs no announcement: the dropdown switching to it
+      // says it worked. Only the odd case gets words.
+      sendStatus(added ? "" : `${name} was already on the list`);
+      sendTasks(picked);
+      // The page puts this key on the new task. That comes back here as
+      // a settings change, like picking it from the dropdown would.
+      streamDeck.ui.sendToPropertyInspector({ event: "added", name }).catch(() => {});
+      return;
+    }
+
+    if (asked.event === "setColor") {
+      // The color goes straight into the pictures, so only a plain hex
+      // color like #f2a7c3 gets in.
+      if (!/^#[0-9a-f]{6}$/i.test(asked.color ?? "")) return;
+      history.setColor(String(asked.task ?? ""), asked.color);
+      redraw();
+    }
+
+    sendTasks(picked);
   }
 
   onWillDisappear(ev) {
@@ -138,17 +207,14 @@ class TimerKey extends SingletonAction {
     if (outcome === "done") target.showOk().catch(() => {});
   }
 
-  // Keeps the task's color with the history, for the heat map.
-  remember(id) {
-    const p = plan(this.settings.get(id));
-    history.remember(p.task, p.color);
-  }
-
   async render(target) {
     // Every setImage is a message to Stream Deck, so a picture only goes
     // out when it's different from the last one. Most seconds it is,
     // while a timer runs, and never while nothing does.
-    const image = asImage(drawKey(timer.face(this.settings.get(target.id) ?? {}, Date.now())));
+    const face = timer.face(this.settings.get(target.id) ?? {}, Date.now());
+    // The color belongs to the task now, not to the key.
+    face.color = colorFor(plan(this.settings.get(target.id)).task);
+    const image = asImage(drawKey(face));
     if (this.lastImages.get(target.id) === image) return;
     this.lastImages.set(target.id, image);
     await target.setImage(image);
@@ -164,8 +230,26 @@ class HeatMap extends SingletonAction {
   lastImages = new Map();
 
   async onWillAppear(ev) {
-    this.showing.set(ev.action.id, ev.payload.settings?.task ?? null);
+    this.showing.set(ev.action.id, this.pick(ev.payload.settings));
     await this.render(ev.action);
+  }
+
+  // I picked a task from the dropdown on the dial's settings page.
+  async onDidReceiveSettings(ev) {
+    this.showing.set(ev.action.id, this.pick(ev.payload.settings));
+    await this.render(ev.action);
+  }
+
+  // The settings page asking for the list.
+  onSendToPlugin() {
+    sendTasks();
+  }
+
+  // The task a dial's settings point at, or null for all of them. A
+  // dial I've never touched has no setting, and that's all of them too.
+  pick(settings) {
+    const task = settings?.task;
+    return task && task !== ALL ? task : null;
   }
 
   onWillDisappear(ev) {
@@ -177,10 +261,7 @@ class HeatMap extends SingletonAction {
   // Turning flips through All and then each task, and goes round at both
   // ends. The name shows for a moment so I know which map I've landed on.
   async onDialRotate(ev) {
-    // Every task with history, plus the ones on keys that haven't
-    // finished a session yet.
-    const onKeys = [...timerKey.settings.values()].map(settings => plan(settings).task);
-    const list = [null, ...new Set([...history.tasks(), ...onKeys])];
+    const list = [null, ...history.tasks()];
 
     const at = Math.max(0, list.indexOf(this.showing.get(ev.action.id) ?? null));
     // JavaScript's % keeps the minus sign (-1 % 5 is -1), so I add the
@@ -202,8 +283,9 @@ class HeatMap extends SingletonAction {
 
   async show(target, task) {
     this.showing.set(target.id, task);
-    // Saved in the dial's settings so it's on the same map after a restart.
-    await target.setSettings({ task });
+    // Saved in the dial's settings so it's on the same map after a
+    // restart, and so the dropdown on its settings page agrees.
+    await target.setSettings({ task: task ?? ALL });
     await this.showNotice(target, task ?? "All tasks");
   }
 
@@ -226,7 +308,7 @@ class HeatMap extends SingletonAction {
         totals: history.totals(task),
         today: dayOf(Date.now()),
         // All tasks together is always pink. One task is its own color.
-        color: task ? history.colorOf(task) : PINK,
+        color: task ? colorFor(task) : PINK,
         notice: this.notices.get(target.id),
       }),
     );
@@ -264,10 +346,9 @@ streamDeck.actions.registerAction(heatMap);
 setInterval(() => {
   const now = Date.now();
   const task = timer.run?.task;
-  const color = timer.run?.color;
   const result = timer.tick(now);
   if (result) {
-    keep(result, now, color);
+    keep(result, now);
     announce(task, result.finished);
   }
   redraw();

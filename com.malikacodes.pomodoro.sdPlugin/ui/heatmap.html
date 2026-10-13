@@ -1,0 +1,18 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this dial's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <!-- Which heat map this dial shows: one task, or all of them added
+         up. It's the same thing turning the dial changes, so the two
+         always agree. The list comes from the plugin ("getTasksOrAll"),
+         and tasks are added on a Timer key's settings page. -->
+    <sdpi-item label="Show">
+      <sdpi-select setting="task" datasource="getTasksOrAll" hot-reload placeholder="All tasks"></sdpi-select>
+    </sdpi-item>
+  </body>
+</html>

@@ -32,8 +32,9 @@ Property Inspector, the panel at the bottom).
 
 | Setting | What it's for | If I leave it alone |
 |---|---|---|
-| Task | The name on the key, and the name its focus time is saved under | Focus |
-| Color | That task's heat map, and its time on the key during a break | Pink |
+| Task | Which task this key times, picked from my task list. It's the name on the key and the name its focus time is saved under | Focus |
+| Color | The picked task's color: its heat map, and its time on the key during a break. It belongs to the task, so it's the same on every key for that task | Pink |
+| New task | Type a name and press Add. It goes on the list and this key switches to it | |
 | Interval timer | Off makes it one plain countdown with no breaks | On |
 | Focus | Minutes per focus round | 45 |
 | Rounds | Focus rounds before the long break, 1 to 8 | 4 |
@@ -42,8 +43,15 @@ Property Inspector, the panel at the bottom).
 | Auto start | Start the next focus or break by itself | Off |
 | Double tap | Tap twice to jump to the break | On |
 
-To time a second thing, I drag another Timer key onto the deck and give
-it a different name.
+To time a second thing, I drag another Timer key onto the deck and pick
+a different task, or add a new one right there.
+
+The Heat Map dial has one setting, Show: all tasks, or one task from
+the same list. Turning the dial changes the same thing.
+
+The task list is one list for the whole plugin. I used to type the name
+into each key, and one slip of the finger made a second task with its
+own empty heat map. A dropdown can't misspell.
 
 ## How it works
 
@@ -59,7 +67,7 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
 - `presses.js` tells a tap from a double tap from a hold. Stream Deck
   only reports "down" and "up".
 - `history.js` saves each finished focus session and adds them up per
-  day for the map.
+  day for the map. It keeps the task list too.
 - `draw.js` makes the pictures as SVG text.
 - `index.js` is the only file that talks to Stream Deck. The table at
   the top of it says which gesture does what, so changing one is a one
@@ -104,10 +112,15 @@ Pomodoro in the action list.
 
 ## Good to know
 
-- Focus time is saved under the task's name. Renaming a task starts a
-  new map for it, and the old name stays in the dial's list.
-- Two keys with the same name are the same task. Either one controls
-  its timer.
+- Focus time is saved under the task's name. There's no way to rename
+  or remove a task from the settings yet. The list is the `colors` part
+  of `sessions.json`, and the plugin has to be stopped before editing it.
+- Two keys on the same task are one timer. Either one controls it.
+- If I switch a key to another task while its timer is running, the
+  timer keeps going under the old task. Switching the key back gets me
+  the controls again.
+- A new Timer key starts on a task called Focus.
+- Tasks are listed A to Z, on the dropdowns and when I turn the dial.
 - Changing a key's lengths while its timer is running takes effect the
   next time I start it, not mid round.
 - With auto start off, the next period shows as "Paused" until I tap.
@@ -127,5 +140,5 @@ npm test
 
 They cover the rounds and breaks, that paused time isn't counted,
 partial sessions, one task at a time, picking a timer back up after a
-restart, taps against double taps against holds, the day totals and
+restart, the task list, taps against double taps against holds, the day totals and
 shades, and that everything is drawn on pure black.

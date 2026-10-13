@@ -5,24 +5,74 @@
     <!-- Elgato's settings components. Each one saves into this key's
          settings under the name in "setting". -->
     <script src="sdpi-components.js"></script>
-    <!-- On its own a color swatch stretches across the whole row. This
-         keeps it to a small box. -->
+    <!-- The color box and the "New task" box are plain HTML, because
+         they don't save into this key's settings like the rest. They
+         belong to the task list, and timer.js sends them to the plugin.
+         The colors and sizes here are copied from Elgato's own boxes so
+         they sit in with them. -->
     <style>
-      sdpi-color {
-        display: block;
+      #color {
         width: 36px;
+        height: 30px;
+        padding: 0;
+        border: none;
+        background: none;
+      }
+      .add {
+        display: flex;
+        gap: 6px;
+      }
+      /* The line under the New task box. It takes up no room at all
+         until there's something to say. */
+      #status {
+        padding-top: 4px;
+        color: #969696;
+        font-size: 9pt;
+      }
+      #status:empty {
+        display: none;
+      }
+      #new-task {
+        flex: 1;
+        min-width: 0;
+        height: 30px;
+        box-sizing: border-box;
+        padding: 0 6px;
+        border: none;
+        border-radius: 0;
+        background-color: #3d3d3d;
+        color: #d8d8d8;
+        font-family: inherit;
+        font-size: 9pt;
+        outline: none;
       }
     </style>
   </head>
   <body>
-    <!-- What I'm timing. The name is also what the heat map files this
-         task's focus time under, so renaming it starts a new map. -->
+    <!-- What I'm timing, picked from my task list. The list belongs to
+         the plugin, so every Timer key and the Heat Map dial show the
+         same one. "hot-reload" fills it in again when I add a task. -->
     <sdpi-item label="Task">
-      <sdpi-textfield setting="name" placeholder="Focus" maxlength="30"></sdpi-textfield>
+      <sdpi-select setting="name" datasource="getTasks" hot-reload placeholder="Pick a task"></sdpi-select>
     </sdpi-item>
-    <!-- This task's heat map, and its time on the key during a break. -->
+    <!-- The picked task's color: its heat map, and its time on the key
+         during a break. It's the task's, not this key's, so changing it
+         here changes it on every key for that task. -->
     <sdpi-item label="Color">
-      <sdpi-color setting="color" default="#f2a7c3"></sdpi-color>
+      <input type="color" id="color" value="#f2a7c3" />
+    </sdpi-item>
+    <!-- Adds a task to the list and puts this key on it. The line
+         underneath only shows up when an add didn't go as planned, like
+         a name that's already on the list. It sits inside this row on
+         purpose: a row of its own with no label still draws the colon. -->
+    <sdpi-item label="New task">
+      <div>
+        <div class="add">
+          <input type="text" id="new-task" maxlength="30" placeholder="Name" />
+          <sdpi-button id="add">Add</sdpi-button>
+        </div>
+        <div id="status"></div>
+      </div>
     </sdpi-item>
 
     <!-- Off makes it one plain countdown: no breaks and no rounds. -->
@@ -65,5 +115,7 @@
     <sdpi-item label="Double tap">
       <sdpi-checkbox setting="doubleTap" default="true" label="Tap twice to jump to the break"></sdpi-checkbox>
     </sdpi-item>
+
+    <script src="timer.js"></script>
   </body>
 </html>

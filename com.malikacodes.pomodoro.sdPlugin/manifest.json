@@ -31,6 +31,7 @@
       "Icon": "imgs/timer",
       "Controllers": ["Encoder"],
       "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/heatmap.html",
       "Encoder": {
         "layout": "layouts/strip.json",
         "TriggerDescription": {

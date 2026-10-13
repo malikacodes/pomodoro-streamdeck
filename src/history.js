@@ -92,25 +92,42 @@ export class History {
     return this.#write("sessions.json", this.data);
   }
 
-  // Each task's color is kept here too, so a task whose key I've taken
-  // off the deck still gets its own color on the map. Only for a task
-  // with focus time saved, though. The settings box sends the name after
-  // every letter I type, and without this the file fills up with colors
-  // for "5", "59" and "593".
-  remember(task, color) {
-    if (this.data.colors[task] === color || !this.data.sessions.some(s => s.task === task)) return;
-    this.data.colors[task] = color;
+  // The task list: every task I've added, each with its color. It's in
+  // the same file as the sessions, under "colors". Keys and dials only
+  // pick from this list, so a typo can't quietly start a second task.
+  //
+  // Object.hasOwn asks "is this name really in my list?". Without it, a
+  // task called "constructor" would look like it was already there,
+  // because every JavaScript object has a few names built in.
+  hasTask(name) {
+    return Object.hasOwn(this.data.colors, name);
+  }
+
+  // Adds a task. Says false, and changes nothing, if it's already there.
+  addTask(name, color) {
+    if (this.hasTask(name)) return false;
+    this.data.colors[name] = color;
+    this.#write("sessions.json", this.data);
+    return true;
+  }
+
+  // Changes a task's color. Only for a task on the list.
+  setColor(name, color) {
+    if (!this.hasTask(name) || this.data.colors[name] === color) return;
+    this.data.colors[name] = color;
     return this.#write("sessions.json", this.data);
   }
 
   colorOf(task) {
-    return this.data.colors[task];
+    return this.hasTask(task) ? this.data.colors[task] : undefined;
   }
 
-  // Every task I've ever saved a session for, in the order they first
-  // showed up.
+  // Every task, in the order a person would sort them: A to Z, and
+  // "CIT 593" before "CIT 5930". A task with saved focus time counts
+  // even if it never made it onto the list.
   tasks() {
-    return [...new Set(this.data.sessions.map(s => s.task))];
+    const names = new Set([...Object.keys(this.data.colors), ...this.data.sessions.map(s => s.task)]);
+    return [...names].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
   }
 
   // Focus minutes per day, for one task or (with no task) all of them.
