@@ -6,7 +6,7 @@ import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
-import { drawKey, drawOpenKey, drawStatsKey, drawStrip, short, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
+import { drawKey, drawOpenKey, drawStatsKey, drawStrip, isHex, short, GRAY, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
 import { drawGoalKey } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
 import { streaks } from "./streak.js";
@@ -227,7 +227,7 @@ class TimerKey extends SingletonAction {
     if (asked.event === "setColor") {
       // The color goes straight into the pictures, so only a plain hex
       // color like #f2a7c3 gets in.
-      if (!/^#[0-9a-f]{6}$/i.test(asked.color ?? "")) return;
+      if (!isHex(asked.color)) return;
       history.setColor(String(asked.task ?? ""), asked.color);
       redraw();
     }
@@ -596,7 +596,7 @@ class GoalKey extends SingletonAction {
     const burst = began === undefined ? undefined : (now - began) / CELEBRATION_MS;
 
     // Past the goal the ring just stays full, and the count keeps going.
-    const image = asImage(drawGoalKey(count, `of ${goal}`, "#8a8a90", Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
+    const image = asImage(drawGoalKey(count, `of ${goal}`, GRAY, Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
     const same = this.lastImages.get(target.id) === image;
     this.lastImages.set(target.id, image);
 
@@ -733,7 +733,7 @@ class StreakKey extends SingletonAction {
 
     // The small line says which task, when it's only one. A long name
     // is cut so it stays inside the key.
-    const image = asImage(drawStreakKey(current, task ? short(task, 14) : "", "#8a8a90", tier, burst, sway));
+    const image = asImage(drawStreakKey(current, task ? short(task, 14) : "", GRAY, tier, burst, sway));
     const same = this.lastImages.get(target.id) === image;
     this.lastImages.set(target.id, image);
     if (!same) await target.setImage(image);

@@ -4,21 +4,7 @@
 // everything in draw.js, it only draws: it takes plain numbers and gives
 // back SVG text, so the same numbers always give the same picture.
 
-const FONT = "-apple-system, Helvetica, sans-serif";
-
-// Pure black, to match the deck. Anything lighter shows up as a gray
-// square next to the keys around it.
-const BLACK = "#000000";
-
-// The number when nothing is lit. It's the gray the timer key uses when
-// it's stopped.
-const DIM = "#5c5c62";
-
-// The number and the bottom line are whatever I pass in, and a < or an &
-// would break the SVG.
-function safe(text) {
-  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+import { BLACK, DIM, FONT, safe } from "./draw.js";
 
 // Rounds to one decimal place for writing into the SVG. It goes through
 // Math.round and not toFixed, because toFixed turns a hair below zero into
@@ -327,7 +313,8 @@ export function drawStreakKey(count, small, smallColor, tier, burst, sway) {
     parts.push(`<text x="${(72 + 4.5 * Math.cos(angle)).toFixed(1)}" y="${(112 + 4.5 * Math.sin(angle)).toFixed(1)}" fill="${BLACK}" ${digits}`);
   }
 
-  // With nothing lit the number is gray, like the coal.
+  // With nothing lit the number is dim, like the coal: the same gray the
+  // timer key uses when it's stopped.
   parts.push(`<text x="72" y="112" fill="${tier === 0 ? DIM : "#ffffff"}" ${digits}`);
 
   // The bottom line. It's empty unless there's something to say.

@@ -2,19 +2,7 @@
 // when it's full. This is the same ring as on my GitHub Graph daily goal
 // key. Like draw.js it only draws: no Stream Deck, no files, no clock.
 
-import { PINK } from "./timer.js";
-
-const FONT = "-apple-system, Helvetica, sans-serif";
-
-// Pure black, to match the deck. Anything lighter shows up as a gray
-// square next to the keys around it.
-const BLACK = "#000000";
-
-// The count and the small line are whatever the caller hands in, and a <
-// or an & would break the SVG.
-function safe(text) {
-  return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-}
+import { BLACK, FONT, ramp, safe } from "./draw.js";
 
 // The confetti colors. Each piece takes the next one, going round the list.
 const CONFETTI = ["#ff7eb6", "#ffd33d", "#58a6ff", "#bc8cff", "#ffa657", "#39d353", "#ffffff"];
@@ -101,14 +89,13 @@ export function drawGoalKey(count, small, smallColor, fill, met, burst, color) {
   count = String(count);
   small = String(small);
 
-  // The color comes from a key's settings and goes straight into the SVG,
-  // so anything that isn't a plain hex color like #f2a7c3 falls back to
-  // pink.
-  const full = /^#[0-9a-f]{6}$/i.test(color ?? "") ? color : PINK;
-
-  // The same color at 75%: each of its red, green and blue numbers is
-  // multiplied by 0.75, which is the same as mixing it with a bit of black.
-  const darker = "#" + [1, 3, 5].map(i => Math.round(parseInt(full.slice(i, i + 2), 16) * 0.75).toString(16).padStart(2, "0")).join("");
+  // The color comes from a key's settings and goes straight into the SVG.
+  // ramp checks it (anything that isn't a hex color goes to pink) and
+  // hands back the heat map's shades of it. The ring fades from the 75%
+  // one up to the full color.
+  const shades = ramp(color);
+  const full = shades[4];
+  const darker = shades[3];
 
   const ring = `fill="none" stroke-width="12"`;
   let content = `<circle cx="72" cy="72" r="52" stroke="#21262d" ${ring}/>`;

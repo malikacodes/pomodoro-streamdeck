@@ -1,15 +1,24 @@
 // Draws the key and the dial's strip as SVG text. It only draws: no
 // Stream Deck, no files, no clock, so the tests can read what it made.
+//
+// The bits every picture shares live here too (the font, the blacks and
+// grays, the hex check and the shades), and flames.js and goal.js
+// import them. One copy of black to keep pure, instead of three.
 
 import { clock, PINK } from "./timer.js";
 import { level } from "./history.js";
 
-const DIM = "#5c5c62";
-const FONT = "-apple-system, Helvetica, sans-serif";
+export const FONT = "-apple-system, Helvetica, sans-serif";
 
 // Pure black, to match the deck. Anything lighter shows up as a gray
 // square next to the keys around it.
-const BLACK = "#000000";
+export const BLACK = "#000000";
+
+// The two grays. GRAY is for words that aren't the point: the task's
+// name above the time, the small line under a count. DIM is for a time
+// that isn't counting and a streak number with no fire under it.
+export const GRAY = "#8a8a90";
+export const DIM = "#5c5c62";
 
 // A square for a day with no focus time. It's the same color as an empty
 // day on my GitHub Graph dial, so the two maps match when they sit side
@@ -23,7 +32,7 @@ const EMPTY = "#21262d";
 const UPCOMING = "#1a1e24";
 
 // Task names are whatever I typed, and a < or an & would break the SVG.
-function safe(text) {
+export function safe(text) {
   return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
@@ -31,21 +40,35 @@ export function short(name, most) {
   return name.length > most ? name.slice(0, most - 1).trimEnd() + "…" : name;
 }
 
-// The colors come from a key's settings and go straight into the SVG, so
-// anything that isn't a plain hex color like #f2a7c3 falls back to pink.
+// A plain hex color like #f2a7c3, and nothing else. Colors come from a
+// key's settings and go straight into the SVG, so this is the gate.
+// timer.js has the same check written out, because this file imports
+// timer.js and the two can't import each other.
+export function isHex(value) {
+  return /^#[0-9a-f]{6}$/i.test(value ?? "");
+}
+
+// The color to draw with: what I picked, or pink for anything that
+// isn't a hex color.
 function color(value) {
-  return /^#[0-9a-f]{6}$/i.test(value ?? "") ? value : PINK;
+  return isHex(value) ? value : PINK;
+}
+
+// A color at some fraction of its strength: each of its red, green and
+// blue numbers is multiplied by it, which is the same as mixing the
+// color with black. 1 is the color itself.
+function shade(hex, strength) {
+  return "#" + [1, 3, 5].map(i => Math.round(parseInt(hex.slice(i, i + 2), 16) * strength).toString(16).padStart(2, "0")).join("");
 }
 
 // The map's five shades from one color: the empty gray, then the color
-// at 30%, 50%, 75% and full strength. "At 30%" means each of its red,
-// green and blue numbers is multiplied by 0.3, which is the same as
-// mixing it with black. That way any color I pick gets a ramp.
+// at 30%, 50%, 75% and full strength. That way any color I pick gets a
+// ramp. The goal key's ring borrows the 75% one. The full one goes
+// through shade too, so a color typed in capitals comes out lowercase
+// like the rest and two pictures of the same color are the same text.
 export function ramp(picked) {
   const hex = color(picked);
-  const parts = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16));
-  const at = strength => "#" + parts.map(p => Math.round(p * strength).toString(16).padStart(2, "0")).join("");
-  return [EMPTY, at(0.3), at(0.5), at(0.75), at(1)];
+  return [EMPTY, shade(hex, 0.3), shade(hex, 0.5), shade(hex, 0.75), shade(hex, 1)];
 }
 
 // The key, 144 by 144 pixels: a small word on top, the time in the
@@ -59,7 +82,7 @@ export function drawKey(face) {
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
     `<rect width="144" height="144" fill="${BLACK}"/>`,
-    `<text x="72" y="38" fill="${face.tone === "break" ? fill : "#8a8a90"}" font-size="20" font-weight="600" text-anchor="middle">${safe(short(face.label, 12))}</text>`,
+    `<text x="72" y="38" fill="${face.tone === "break" ? fill : GRAY}" font-size="20" font-weight="600" text-anchor="middle">${safe(short(face.label, 12))}</text>`,
     `<text x="72" y="88" fill="${fill}" font-size="38" font-weight="600" text-anchor="middle">${clock(face.ms)}</text>`,
   ];
 
@@ -67,7 +90,7 @@ export function drawKey(face) {
   // color its heat map uses. Gray for the round I'm in, nearly black for
   // the ones to come. They're 16 apart and centered, so eight still fit.
   for (let i = 0; i < face.rounds; i++) {
-    const dot = i < face.done ? color(face.color) : i + 1 === face.current ? "#8a8a90" : "#2c2c30";
+    const dot = i < face.done ? color(face.color) : i + 1 === face.current ? GRAY : "#2c2c30";
     parts.push(`<circle cx="${72 - (face.rounds - 1) * 8 + i * 16}" cy="120" r="4" fill="${dot}"/>`);
   }
 
@@ -90,9 +113,9 @@ export function drawStatsKey({ label, sessions, period, color: picked }) {
   return [
     `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
     `<rect width="144" height="144" fill="${BLACK}"/>`,
-    `<text x="72" y="38" fill="#8a8a90" font-size="20" font-weight="600" text-anchor="middle">${safe(short(label, 12))}</text>`,
+    `<text x="72" y="38" fill="${GRAY}" font-size="20" font-weight="600" text-anchor="middle">${safe(short(label, 12))}</text>`,
     `<text x="72" y="${74 + size / 3}" fill="#ffffff" font-size="${size}" font-weight="600" text-anchor="middle">${total}</text>`,
-    `<text x="72" y="126" fill="#8a8a90" font-size="18" font-weight="600" text-anchor="middle"><tspan fill="${color(picked)}">●</tspan> ${safe(period)}</text>`,
+    `<text x="72" y="126" fill="${GRAY}" font-size="18" font-weight="600" text-anchor="middle"><tspan fill="${color(picked)}">●</tspan> ${safe(period)}</text>`,
     "</svg>",
   ].join("");
 }

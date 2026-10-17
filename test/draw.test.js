@@ -77,6 +77,13 @@ test("a picked color makes five different shades ending on itself", () => {
   assert.deepEqual([...shades].sort((a, b) => brightness(a) - brightness(b)), shades);
 });
 
+// A color typed in capitals is the same color, and it has to come out
+// as the same text, or the same map drawn twice would count as changed.
+test("a color in capitals gives the same shades as in lowercase", () => {
+  assert.deepEqual(ramp("#88CCFF"), ramp("#88ccff"));
+  assert.equal(ramp("#88CCFF")[4], "#88ccff");
+});
+
 // A color that isn't a hex color goes to pink and not into the SVG.
 test("a bad color falls back to pink", () => {
   assert.equal(ramp("javascript:")[4], "#f2a7c3");
