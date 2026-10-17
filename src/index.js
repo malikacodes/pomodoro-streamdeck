@@ -49,8 +49,16 @@ function announce(task, finished) {
     : next === "long" ? "Focus done. Time for the long break."
     : next === "short" ? "Focus done. Time for a short break."
     : "Time's up.";
-  execFile("/usr/bin/afplay", ["/System/Library/Sounds/Glass.aiff"], { timeout: 10000 }, () => {});
-  execFile("/usr/bin/osascript", ["-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", task, message], { timeout: 10000 }, () => {});
+  // Neither one is waited for, but a sound that never played is worth a
+  // line in the log, or I'd blame the deck.
+  const played = error => {
+    if (error) streamDeck.logger.warn(`Couldn't play the sound: ${error.message}`);
+  };
+  const shown = error => {
+    if (error) streamDeck.logger.warn(`Couldn't show the notification: ${error.message}`);
+  };
+  execFile("/usr/bin/afplay", ["/System/Library/Sounds/Glass.aiff"], { timeout: 10000 }, played);
+  execFile("/usr/bin/osascript", ["-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", task, message], { timeout: 10000 }, shown);
 }
 
 // Whatever the timer hands back after a command or a tick gets filed
