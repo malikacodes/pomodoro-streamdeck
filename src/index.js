@@ -29,6 +29,15 @@ function asImage(svg) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+// For the places that ask Stream Deck for something and don't wait for
+// the answer: a picture, an alert, a word to the settings page. If it
+// doesn't go through, the log says what didn't, the same way redraw
+// does. A catch that swallows the error would leave a blank key with
+// nothing to read afterwards.
+function warn(what) {
+  return error => streamDeck.logger.warn(`Couldn't ${what}: ${error.message}`);
+}
+
 // A period ran out by itself: one of macOS's own sounds, and a
 // notification in case I'm not looking at the deck. The words go to
 // osascript as arguments and are never pasted into the script, so a task
@@ -119,12 +128,12 @@ function sendTasks(picked) {
     { event: "getTasksOrAll", items: [{ value: ALL, label: "All tasks" }, ...items] },
     { event: "tasks", colors, picked },
   ]) {
-    streamDeck.ui.sendToPropertyInspector(message).catch(() => {});
+    streamDeck.ui.sendToPropertyInspector(message).catch(warn("send the task list to the settings page"));
   }
 }
 
 function sendStatus(text) {
-  streamDeck.ui.sendToPropertyInspector({ event: "status", text }).catch(() => {});
+  streamDeck.ui.sendToPropertyInspector({ event: "status", text }).catch(warn("send a status to the settings page"));
 }
 
 // Runs one command. settings is the key's settings, or null from the
@@ -220,7 +229,7 @@ class TimerKey extends SingletonAction {
       sendTasks(picked);
       // The page puts this key on the new task. That comes back here as
       // a settings change, like picking it from the dropdown would.
-      streamDeck.ui.sendToPropertyInspector({ event: "added", name }).catch(() => {});
+      streamDeck.ui.sendToPropertyInspector({ event: "added", name }).catch(warn("tell the settings page about the new task"));
       return;
     }
 
@@ -258,8 +267,8 @@ class TimerKey extends SingletonAction {
 
     // The yellow triangle means "another task is running". The check
     // mark is for Done, so I know the hold landed.
-    if (outcome === "busy") target.showAlert().catch(() => {});
-    if (outcome === "done") target.showOk().catch(() => {});
+    if (outcome === "busy") target.showAlert().catch(warn("show the alert"));
+    if (outcome === "done") target.showOk().catch(warn("show the check mark"));
   }
 
   async render(target) {
@@ -332,7 +341,7 @@ class HeatMap extends SingletonAction {
       history.tap(next);
       // The name goes across all four dials at once.
       for (const dial of this.actions) {
-        if (this.onTaskPage(dial.id)) this.showNotice(dial, next).catch(() => {});
+        if (this.onTaskPage(dial.id)) this.showNotice(dial, next).catch(warn("show the task's name on the dial"));
       }
       redraw();
       return;
@@ -373,7 +382,7 @@ class HeatMap extends SingletonAction {
       // Only clear it if a newer message hasn't replaced it.
       if (this.notices.get(target.id) !== text) return;
       this.notices.delete(target.id);
-      this.render(target).catch(() => {});
+      this.render(target).catch(warn("put the map back on the dial"));
     }, NOTICE_MS);
   }
 
@@ -620,7 +629,7 @@ class GoalKey extends SingletonAction {
       this.started.delete(target.id);
       stopAnimating(target.id);
     }
-    this.render(target).catch(() => {});
+    this.render(target).catch(warn("draw the goal key"));
   }
 }
 
@@ -716,7 +725,7 @@ class StreakKey extends SingletonAction {
 
     // A lit fire that isn't in a burst sways, so it's in the idling line
     // for as long as it's showing. A cold coal has nothing to sway.
-    if (current > 0 && !this.flared.has(target.id)) idle(target.id, () => this.render(target).catch(() => {}));
+    if (current > 0 && !this.flared.has(target.id)) idle(target.id, () => this.render(target).catch(warn("draw the streak key")));
     else stopIdling(target.id);
 
     // The tier is how many rows of the table the streak has reached. A
@@ -754,7 +763,7 @@ class StreakKey extends SingletonAction {
       this.flared.delete(target.id);
       stopAnimating(target.id);
     }
-    this.render(target).catch(() => {});
+    this.render(target).catch(warn("draw the streak key"));
   }
 }
 
@@ -778,7 +787,7 @@ function redraw() {
   for (const owner of [timerKey, heatMap, statsKey, goalKey, streakKey]) {
     for (const target of owner.actions) {
       if (owner.moving?.(target.id)) continue;
-      owner.render(target).catch(error => streamDeck.logger.warn(`Couldn't redraw: ${error.message}`));
+      owner.render(target).catch(warn("redraw"));
     }
   }
 }
