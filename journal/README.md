@@ -20,3 +20,4 @@ second.
 | 11 | 2026-10-17 | [Nothing to read afterwards](11-nothing-to-read-afterwards.md) |
 | 12 | 2026-10-17 | [The key that knew too much](12-the-key-that-knew-too-much.md) |
 | 13 | 2026-10-17 | [A year of squares a second](13-a-year-of-squares-a-second.md) |
+| 14 | 2026-10-17 | [A color nobody read](14-a-color-nobody-read.md) |
