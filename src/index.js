@@ -5,7 +5,7 @@ import { execFile } from "node:child_process";
 import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
-import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
+import { History, PERIODS, dayOf, lastWeeks, periodStart, step } from "./history.js";
 import { drawKey, drawOpenKey, drawStatsKey, drawStrip, isHex, short, GRAY, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
 import { drawGoalKey, goalOf } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
@@ -333,14 +333,6 @@ class HeatMap extends SingletonAction {
     return this.settings.get(id)?.task === TAPPED;
   }
 
-  // Where a turn lands: ticks steps along the list from where I am, going
-  // round at both ends. JavaScript's % keeps the minus sign (-1 % 5 is
-  // -1), so I add the length back before taking it again.
-  step(list, current, ticks) {
-    const at = Math.max(0, list.indexOf(current));
-    return list[(((at + ticks) % list.length) + list.length) % list.length];
-  }
-
   // Turning flips through All and then each task. The name shows for a
   // moment so I know which map I've landed on. On the task page there's
   // no All: turning any of the four dials moves the whole page to the
@@ -349,7 +341,7 @@ class HeatMap extends SingletonAction {
     if (this.onTaskPage(ev.action.id)) {
       const tasks = history.tasks();
       if (tasks.length === 0) return;
-      const next = this.step(tasks, history.tapped(), ev.payload.ticks);
+      const next = step(tasks, history.tapped(), ev.payload.ticks);
       history.tap(next);
       // The name goes across all four dials at once.
       for (const dial of this.actions) {
@@ -359,7 +351,7 @@ class HeatMap extends SingletonAction {
       return;
     }
 
-    const next = this.step([null, ...history.tasks()], pickedTask(this.settings.get(ev.action.id)), ev.payload.ticks);
+    const next = step([null, ...history.tasks()], pickedTask(this.settings.get(ev.action.id)), ev.payload.ticks);
     const settings = { ...this.settings.get(ev.action.id), task: next ?? ALL };
     this.settings.set(ev.action.id, settings);
     // Saved in the dial's settings so it's on the same map after a

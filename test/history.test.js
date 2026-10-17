@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { chmod, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { History, dataDir, dayOf, lastWeeks, level, periodStart } from "../src/history.js";
+import { History, dataDir, dayOf, lastWeeks, level, periodStart, step } from "../src/history.js";
 
 // Every test gets its own empty folder, so none of them can see my real
 // history or each other's.
@@ -310,4 +310,21 @@ test("a clock change doesn't repeat or skip a day", () => {
   const days = lastWeeks(at(2026, 11, 7), 2).flat();
   assert.equal(new Set(days).size, 14);
   assert.deepEqual(days.slice(6, 9), ["2026-10-31", "2026-11-01", "2026-11-02"]);
+});
+
+// Where a dial turn lands on the task list: it goes round at both ends,
+// and a task that has since left the list counts as being at the top.
+test("a turn steps along the list and wraps at both ends", () => {
+  const list = ["All", "Baking", "CIT 594"];
+  assert.equal(step(list, "All", 1), "Baking");
+  assert.equal(step(list, "CIT 594", 1), "All");
+  assert.equal(step(list, "All", -1), "CIT 594");
+  assert.equal(step(list, "Baking", 7), "CIT 594");
+  assert.equal(step(list, "Baking", -4), "All");
+  assert.equal(step(list, "Gone", 0), "All");
+  assert.equal(step(list, "Gone", 1), "Baking");
+  assert.equal(step(list, undefined, -1), "CIT 594");
+  // The real list on a dial has null for "All tasks" at the top.
+  assert.equal(step([null, "Baking"], null, 1), "Baking");
+  assert.equal(step([null, "Baking"], "Baking", 1), null);
 });
