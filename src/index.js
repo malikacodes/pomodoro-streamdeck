@@ -29,6 +29,19 @@ function asImage(svg) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
 }
 
+// Sends a picture to a key or dial, unless it's the one already there.
+// Every setImage is a message to Stream Deck, so a picture only goes
+// out when it's different from the last one sent to that key. Each
+// class keeps its own lastImages map, since each forgets a key when it
+// leaves the page. A dial takes its picture a different way from a key.
+async function send(target, lastImages, svg) {
+  const image = asImage(svg);
+  if (lastImages.get(target.id) === image) return;
+  lastImages.set(target.id, image);
+  if (target.controllerType === "Encoder") await target.setFeedback({ canvas: image });
+  else await target.setImage(image);
+}
+
 // For the places that ask Stream Deck for something and don't wait for
 // the answer: a picture, an alert, a word to the settings page. If it
 // doesn't go through, the log says what didn't, the same way redraw
@@ -280,17 +293,11 @@ class TimerKey extends SingletonAction {
   }
 
   async render(target) {
-    // Every setImage is a message to Stream Deck, so a picture only goes
-    // out when it's different from the last one. Most seconds it is,
-    // while a timer runs, and never while nothing does.
     const settings = this.settingsOf(target.id);
     const face = timer.face(settings, Date.now());
     // The color belongs to the task now, not to the key.
     face.color = colorFor(plan(settings).task);
-    const image = asImage(drawKey(face));
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setImage(image);
+    await send(target, this.lastImages, drawKey(face));
   }
 }
 
@@ -406,7 +413,9 @@ class HeatMap extends SingletonAction {
     // "wide" is the map across all four dials. Each dial draws the slice
     // for the column it sits in.
     const wide = settings.wide === true;
-    const image = asImage(
+    await send(
+      target,
+      this.lastImages,
       drawStrip({
         columns: lastWeeks(Date.now(), wide ? WEEKS_WIDE : WEEKS_SHOWN),
         totals: history.totals(task),
@@ -417,9 +426,6 @@ class HeatMap extends SingletonAction {
         slot: wide ? (target.coordinates?.column ?? 0) : undefined,
       }),
     );
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setFeedback({ canvas: image });
   }
 }
 
@@ -497,7 +503,9 @@ class StatsKey extends SingletonAction {
     const task = pickedTask(settings);
     const period = this.period(settings);
     const now = Date.now();
-    const image = asImage(
+    await send(
+      target,
+      this.lastImages,
       drawStatsKey({
         label: task ?? "All tasks",
         sessions: history.sessionCount(task, periodStart(period, now)),
@@ -505,9 +513,6 @@ class StatsKey extends SingletonAction {
         color: task ? colorFor(task) : PINK,
       }),
     );
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setImage(image);
   }
 }
 
@@ -607,13 +612,12 @@ class GoalKey extends SingletonAction {
     const began = this.started.get(target.id);
     const burst = began === undefined ? undefined : (now - began) / CELEBRATION_MS;
 
-    // Past the goal the ring just stays full, and the count keeps going.
-    const image = asImage(drawGoalKey(count, `of ${goal}`, GRAY, Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
-    const same = this.lastImages.get(target.id) === image;
-    this.lastImages.set(target.id, image);
-
+    // The date goes to Stream Deck before the picture does, so a restart
+    // between the two still knows today is done.
     if (starting) await target.setSettings({ ...settings, celebrated: today });
-    if (!same) await target.setImage(image);
+
+    // Past the goal the ring just stays full, and the count keeps going.
+    await send(target, this.lastImages, drawGoalKey(count, `of ${goal}`, GRAY, Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
   }
 
   // Starts a key's stopwatch and puts it in the queue for animation
@@ -731,10 +735,7 @@ class StreakKey extends SingletonAction {
 
     // The small line says which task, when it's only one. A long name
     // is cut so it stays inside the key.
-    const image = asImage(drawStreakKey(current, task ? short(task, 14) : "", GRAY, tier, burst, sway));
-    const same = this.lastImages.get(target.id) === image;
-    this.lastImages.set(target.id, image);
-    if (!same) await target.setImage(image);
+    await send(target, this.lastImages, drawStreakKey(current, task ? short(task, 14) : "", GRAY, tier, burst, sway));
   }
 
   // Starts a key's burst stopwatch and puts it in the queue for
