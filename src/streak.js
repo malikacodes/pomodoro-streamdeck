@@ -4,6 +4,21 @@
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+// The two settings the streak key reads. The settings page shows Daily
+// and 1 before anything is picked, but it doesn't save them until I
+// change them, so a new key arrives with no settings at all. Whatever
+// does arrive is checked here.
+export function modeOf(settings) {
+  return settings.mode === "weekdays" || settings.mode === "weekly" ? settings.mode : "daily";
+}
+
+// 0 is a real choice here (no grace at all), so the default of 1 is
+// only for a value that's missing or isn't a number.
+export function graceOf(settings) {
+  const grace = Number(settings.graceDays ?? 1);
+  return Number.isNaN(grace) ? 1 : Math.min(3, Math.max(0, Math.round(grace)));
+}
+
 // Turns "2026-10-05" into a plain count of days since January 1, 1970.
 // Counting in whole numbers means the next day is always just +1, with no
 // months, leap years or clock changes to think about. It's done in UTC so

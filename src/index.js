@@ -9,7 +9,7 @@ import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
 import { drawKey, drawOpenKey, drawStatsKey, drawStrip, isHex, short, GRAY, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
 import { drawGoalKey, goalOf } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
-import { streaks } from "./streak.js";
+import { graceOf, modeOf, streaks } from "./streak.js";
 import { SWAY_MS, TIERS, drawStreakKey } from "./flames.js";
 
 const NOTICE_MS = 2000;
@@ -703,20 +703,6 @@ class StreakKey extends SingletonAction {
     await this.render(ev.action);
   }
 
-  // The settings page shows Daily and 1 before anything is picked, but
-  // it doesn't save them until I change them, so a new key arrives with
-  // no settings at all. Whatever does arrive is checked.
-  mode(settings) {
-    return settings.mode === "weekdays" || settings.mode === "weekly" ? settings.mode : "daily";
-  }
-
-  // 0 is a real choice here (no grace at all), so the default of 1 is
-  // only for a value that's missing or isn't a number.
-  grace(settings) {
-    const grace = Number(settings.graceDays ?? 1);
-    return Number.isNaN(grace) ? 1 : Math.min(3, Math.max(0, Math.round(grace)));
-  }
-
   // The one place a key gets its picture from, whether the fire is
   // cold, swaying or flaring.
   async render(target) {
@@ -726,8 +712,8 @@ class StreakKey extends SingletonAction {
 
     const now = Date.now();
     const task = pickedTask(settings);
-    const mode = this.mode(settings);
-    const { current } = streaks(history.totals(task), dayOf(now), mode, this.grace(settings));
+    const mode = modeOf(settings);
+    const { current } = streaks(history.totals(task), dayOf(now), mode, graceOf(settings));
 
     // A new number gets a burst. That covers a key that has just
     // appeared too, because it has no last number yet. 0 never bursts.
