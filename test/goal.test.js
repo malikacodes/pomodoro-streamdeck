@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { drawGoalKey } from "../src/goal.js";
+import { drawGoalKey, goalOf } from "../src/goal.js";
 
 const BLUE = "#88ccff";
 const GRAY = "#8a8a90";
@@ -135,4 +135,19 @@ test("long counts and long small lines shrink to fit, but never under 15px", () 
   assert.deepEqual(sizes(key({ count: "120", small: "minutes" })), [34, 18]);
   assert.deepEqual(sizes(key({ count: "1:30", small: "of 2 hours" })), [26, 15]);
   assert.deepEqual(sizes(key({ count: "12:30:00", small: "a very long line of words" })), [26, 15]);
+});
+
+// The goal comes from the settings page as text, or not at all for a
+// key I've never touched. It has to end up a whole number from 1 to 12
+// whatever arrives: 4 when nothing or nonsense does, 12 at most, and 0
+// is "nothing picked", not a goal of nothing.
+test("the goal setting is read as a whole number from 1 to 12, 4 by default", () => {
+  assert.equal(goalOf({ goal: "4" }), 4);
+  assert.equal(goalOf({ goal: "7" }), 7);
+  assert.equal(goalOf({}), 4);
+  assert.equal(goalOf(undefined), 4);
+  assert.equal(goalOf({ goal: "0" }), 4);
+  assert.equal(goalOf({ goal: "13" }), 12);
+  assert.equal(goalOf({ goal: "abc" }), 4);
+  assert.equal(goalOf({ goal: "2.6" }), 3);
 });

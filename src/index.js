@@ -7,7 +7,7 @@ import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
 import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
 import { drawKey, drawOpenKey, drawStatsKey, drawStrip, isHex, short, GRAY, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
-import { drawGoalKey } from "./goal.js";
+import { drawGoalKey, goalOf } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
 import { streaks } from "./streak.js";
 import { SWAY_MS, TIERS, drawStreakKey } from "./flames.js";
@@ -567,14 +567,6 @@ class GoalKey extends SingletonAction {
     sendTasks();
   }
 
-  // The settings page shows 4 before anything is picked, but it doesn't
-  // save that until I change it, so a new key arrives with no goal at
-  // all. Whatever does arrive is turned into a whole number from 1 to 12.
-  goal(settings) {
-    const goal = Math.round(Number(settings?.goal ?? 4));
-    return Math.min(12, Math.max(1, goal || 4));
-  }
-
   sessionsToday(settings) {
     const now = Date.now();
     return history.sessionCount(pickedTask(settings), periodStart("today", now));
@@ -591,7 +583,7 @@ class GoalKey extends SingletonAction {
   // starts it over.
   async onKeyDown(ev) {
     const settings = this.settings.get(ev.action.id);
-    if (!settings || this.sessionsToday(settings) < this.goal(settings)) return;
+    if (!settings || this.sessionsToday(settings) < goalOf(settings)) return;
     this.celebrate(ev.action);
     await this.render(ev.action);
   }
@@ -606,7 +598,7 @@ class GoalKey extends SingletonAction {
 
     const now = Date.now();
     const today = dayOf(now);
-    const goal = this.goal(settings);
+    const goal = goalOf(settings);
     const count = this.sessionsToday(settings);
     const task = pickedTask(settings);
 

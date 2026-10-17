@@ -4,6 +4,15 @@
 
 import { BLACK, FONT, ramp, safe } from "./draw.js";
 
+// The goal from a key's settings. The settings page shows 4 before
+// anything is picked, but it doesn't save that until I change it, so a
+// new key arrives with no goal at all. Whatever does arrive is turned
+// into a whole number from 1 to 12.
+export function goalOf(settings) {
+  const goal = Math.round(Number(settings?.goal ?? 4));
+  return Math.min(12, Math.max(1, goal || 4));
+}
+
 // The confetti colors. Each piece takes the next one, going round the list.
 const CONFETTI = ["#ff7eb6", "#ffd33d", "#58a6ff", "#bc8cff", "#ffa657", "#39d353", "#ffffff"];
 
