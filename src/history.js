@@ -167,11 +167,13 @@ export class History {
     return Object.hasOwn(this.data.colors, name);
   }
 
-  // Adds a task. Says false, and changes nothing, if it's already there.
-  addTask(name, color) {
+  // Adds a task. Says whether it was new, once its save has been tried
+  // (a save that fails is logged, not thrown). A name that's already
+  // there changes nothing.
+  async addTask(name, color) {
     if (this.hasTask(name)) return false;
     this.data.colors[name] = color;
-    this.#write("sessions.json", this.data);
+    await this.#write("sessions.json", this.data);
     return true;
   }
 

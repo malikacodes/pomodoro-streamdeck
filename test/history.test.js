@@ -108,7 +108,7 @@ test("sessions can be counted from today, this week or this year", async () => {
 test("the task list and its colors are still there after loading again", async () => {
   const dir = await freshDir();
   const first = new History({ dir, logger: quiet });
-  assert.equal(first.addTask("Reading", "#88ccff"), true);
+  assert.equal(await first.addTask("Reading", "#88ccff"), true);
   await first.setColor("Reading", "#aabbcc");
 
   const second = new History({ dir, logger: quiet });
@@ -138,7 +138,7 @@ test("the tapped task is remembered, and forgotten if it leaves the list", async
 test("adding a task that's already there changes nothing", async () => {
   const h = new History({ dir: await freshDir(), logger: quiet });
   h.addTask("Reading", "#88ccff");
-  assert.equal(h.addTask("Reading", "#f2a7c3"), false);
+  assert.equal(await h.addTask("Reading", "#f2a7c3"), false);
   assert.equal(h.colorOf("Reading"), "#88ccff");
 });
 
@@ -155,7 +155,7 @@ test("a color for a task that isn't on the list is ignored", async () => {
 test("a task can be called constructor", async () => {
   const h = new History({ dir: await freshDir(), logger: quiet });
   assert.equal(h.colorOf("constructor"), undefined);
-  assert.equal(h.addTask("constructor", "#88ccff"), true);
+  assert.equal(await h.addTask("constructor", "#88ccff"), true);
   assert.equal(h.colorOf("constructor"), "#88ccff");
 });
 
@@ -261,6 +261,16 @@ test("two quick saves both land, in order", async () => {
   assert.deepEqual(saved.sessions.map(s => s.task), ["Reading", "Cleaning"]);
   assert.equal(saved.colors.Reading, "#aabbcc");
   assert.deepEqual((await readdir(dir)).sort(), ["sessions.json"]);
+});
+
+// Adding a task hands back whether it was new, once its save has been
+// tried, so a caller that needs the file written can wait for it.
+test("adding a task says whether it was new, once its save has been tried", async () => {
+  const dir = await freshDir();
+  const h = new History({ dir, logger: quiet });
+  assert.equal(await h.addTask("Reading", "#88ccff"), true);
+  assert.equal(await h.addTask("Reading", "#f2a7c3"), false);
+  assert.deepEqual(JSON.parse(await readFile(join(dir, "sessions.json"), "utf8")).colors, { Reading: "#88ccff" });
 });
 
 // The running timer goes to its own file and comes back the same, and
