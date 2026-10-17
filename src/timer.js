@@ -45,7 +45,8 @@ function minutesOf(ms) {
 // There is one Timer for the whole plugin, because only one task runs at
 // a time. While something is running, "run" holds all of it:
 //
-//   task, color   whose timer this is
+//   task          whose timer this is. Its color isn't here: that belongs
+//                 to the task, and index.js looks it up when it draws.
 //   plan          the lengths and rounds it started with. Changing a key's
 //                 settings mid-timer doesn't move the goalposts.
 //   phase         "focus", "short" or "long"
@@ -70,7 +71,7 @@ export class Timer {
   start(settings, now) {
     if (this.run) return false;
     const p = plan(settings);
-    this.run = { task: p.task, color: p.color, plan: p, phase: "focus", round: 1, running: true, endsAt: now + p.focus, left: 0 };
+    this.run = { task: p.task, plan: p, phase: "focus", round: 1, running: true, endsAt: now + p.focus, left: 0 };
     return true;
   }
 
@@ -208,7 +209,7 @@ export class Timer {
   face(settings, now) {
     const p = plan(settings);
     if (!this.owns(settings)) {
-      return { label: p.task, ms: p.focus, tone: "idle", color: p.color, rounds: p.intervals ? p.rounds : 0, done: 0, current: 0 };
+      return { label: p.task, ms: p.focus, tone: "idle", rounds: p.intervals ? p.rounds : 0, done: 0, current: 0 };
     }
     const run = this.run;
     const onBreak = run.phase !== "focus";
@@ -216,7 +217,6 @@ export class Timer {
       label: !run.running ? "Paused" : onBreak ? "Break" : run.task,
       ms: this.timeLeft(now),
       tone: !run.running ? "paused" : onBreak ? "break" : "running",
-      color: p.color,
       rounds: run.plan.intervals ? run.plan.rounds : 0,
       done: onBreak ? run.round : run.round - 1,
       current: onBreak ? 0 : run.round,
