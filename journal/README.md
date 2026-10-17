@@ -17,3 +17,4 @@ second.
 | 08 | 2026-10-13 | [A page for one task](08-a-page-for-one-task.md) |
 | 09 | 2026-10-17 | [Three copies of black](09-three-copies-of-black.md) |
 | 10 | 2026-10-17 | [The file that would have vanished](10-the-file-that-would-have-vanished.md) |
+| 11 | 2026-10-17 | [Nothing to read afterwards](11-nothing-to-read-afterwards.md) |
