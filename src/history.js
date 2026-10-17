@@ -6,7 +6,7 @@
 // folder and my history would go with it.
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 
 // POMODORO_HOME is only set by the tests, so they never touch the real
 // folder.
@@ -100,14 +100,52 @@ export class History {
     this.logger = logger;
     this.data = empty();
     this.writing = Promise.resolve();
+    // Set by load when the file on disk has to be left alone (see there).
+    this.keep = false;
   }
 
+  // Reads the file back. No file is the normal first run. Anything else
+  // that goes wrong (the file can't be read, isn't JSON, isn't the shape
+  // above) is said in the log, and the file is set aside as
+  // sessions.json.bad before the next save writes a fresh one next to
+  // it. Starting fresh in memory while leaving the old file in place
+  // would be worse: the next finished session would write over a year
+  // of focus time that a permissions fix could have brought back.
   async load() {
+    const file = join(this.dir, "sessions.json");
+    let data;
     try {
-      const data = JSON.parse(await readFile(join(this.dir, "sessions.json"), "utf8"));
-      if (valid(data)) this.data = data;
+      data = JSON.parse(await readFile(file, "utf8"));
+    } catch (error) {
+      if (error.code === "ENOENT") return;
+      return this.#setAside(file, error.message);
+    }
+    if (valid(data)) this.data = data;
+    else return this.#setAside(file, "it isn't the shape I save");
+  }
+
+  // Moves the file I couldn't use out of the way. If it can't be moved,
+  // or there's already a .bad from an earlier time that I haven't looked
+  // at yet, the file stays where it is and this run doesn't save the
+  // task list or sessions at all. Losing today's sessions is the lesser
+  // evil: the file on disk is the one I'd want back.
+  async #setAside(file, why) {
+    this.logger.warn(`Couldn't use ${file}: ${why}.`);
+    const bad = `${file}.bad`;
+    try {
+      await access(bad);
+      this.keep = true;
+      this.logger.warn(`${bad} is already there from an earlier time. Move it and restart, and until then nothing is saved to sessions.json.`);
+      return;
     } catch {
-      // No history yet, or a broken file: start fresh.
+      // No .bad yet, which is the usual case.
+    }
+    try {
+      await rename(file, bad);
+      this.logger.warn(`Starting fresh, with the old file kept as ${bad}.`);
+    } catch (error) {
+      this.keep = true;
+      this.logger.warn(`Couldn't move it aside (${error.message}), so nothing is saved to sessions.json until it's sorted.`);
     }
   }
 
@@ -208,6 +246,11 @@ export class History {
   // temporary name first and is renamed into place, so the real file is
   // never half written if the plugin is stopped mid-save.
   #write(name, data) {
+    // See #setAside: a file I couldn't read is never written over.
+    if (this.keep && name === "sessions.json") {
+      this.logger.warn(`Not saving ${name}: the one on disk couldn't be read.`);
+      return this.writing;
+    }
     const text = JSON.stringify(data);
     this.writing = this.writing
       .then(async () => {

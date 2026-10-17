@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { History, dataDir, dayOf, lastWeeks, level, periodStart } from "../src/history.js";
@@ -172,12 +172,95 @@ test("tasks come back sorted, with ones that only have focus time", async () => 
 });
 
 // A file that got mangled starts me fresh and doesn't crash the plugin.
-test("a broken history file is ignored", async () => {
+// It isn't thrown away, though: it's set aside as sessions.json.bad,
+// so a year of focus time is still there to dig out by hand.
+test("a broken history file is set aside", async () => {
   const dir = await freshDir();
-  await writeFile(join(dir, "sessions.json"), '{"v":1,"sessions":"oops"}');
+  const mangled = '{"v":1,"sessions":"oops"}';
+  await writeFile(join(dir, "sessions.json"), mangled);
   const h = new History({ dir, logger: quiet });
   await h.load();
   assert.deepEqual(h.tasks(), []);
+  assert.equal(await readFile(join(dir, "sessions.json.bad"), "utf8"), mangled);
+});
+
+// The one that costs data: a file the plugin can't read (permissions, a
+// disk hiccup) used to look like "no history yet", and the next session
+// I finished would be written over it. Now it says so in the log, the
+// file is set aside, and the fresh one is written next to it.
+test("an unreadable file is logged and not overwritten", async t => {
+  const dir = await freshDir();
+  const file = join(dir, "sessions.json");
+  const mine = JSON.stringify({ v: 1, sessions: [{ task: "Reading", date: "2026-10-10", minutes: 45, full: true }], colors: {} });
+  await writeFile(file, mine);
+  await chmod(file, 0o000);
+  // As root, or on a disk that ignores modes, the file reads fine and
+  // there's nothing to test here.
+  if (await readFile(file, "utf8").then(() => true, () => false)) return t.skip("file modes aren't enforced here");
+
+  const warnings = [];
+  const h = new History({ dir, logger: { warn: text => warnings.push(text) } });
+  await h.load();
+  assert.equal(warnings.length, 2);
+  assert.match(warnings[0], /sessions\.json/);
+  assert.match(warnings[0], /EACCES|permission/i);
+  assert.match(warnings[1], /kept as .*sessions\.json\.bad/);
+
+  await h.add({ task: "Cleaning", minutes: 20, full: true }, at(2026, 10, 17));
+  const bad = join(dir, "sessions.json.bad");
+  await chmod(bad, 0o644);
+  assert.equal(await readFile(bad, "utf8"), mine);
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")).sessions.map(s => s.task), ["Cleaning"]);
+
+  // No file at all is the normal first run, and that one stays quiet.
+  const fresh = new History({ dir: await freshDir(), logger: { warn: text => warnings.push(text) } });
+  await fresh.load();
+  assert.equal(warnings.length, 2);
+});
+
+// A second bad load mustn't write over the first file I set aside. With
+// a .bad already there, the file stays put and nothing is saved until
+// I've dealt with it.
+test("a second bad file doesn't replace the .bad one, and nothing is saved over it", async () => {
+  const dir = await freshDir();
+  await writeFile(join(dir, "sessions.json.bad"), "the first one");
+  await writeFile(join(dir, "sessions.json"), "not even json");
+  const warnings = [];
+  const h = new History({ dir, logger: { warn: text => warnings.push(text) } });
+  await h.load();
+  assert.match(warnings.at(-1), /already there/);
+
+  await h.add({ task: "Reading", minutes: 45, full: true }, at(2026, 10, 17));
+  await h.addTask("Reading", "#88ccff");
+  assert.equal(await readFile(join(dir, "sessions.json"), "utf8"), "not even json");
+  assert.equal(await readFile(join(dir, "sessions.json.bad"), "utf8"), "the first one");
+  assert.match(warnings.at(-1), /Not saving sessions\.json/);
+  // The running timer has its own file and still saves.
+  await h.saveRun({ task: "Reading", endsAt: 1 });
+  assert.deepEqual(await h.loadRun(), { task: "Reading", endsAt: 1 });
+});
+
+// Saves are queued, so a session and a color change a moment apart both
+// make it to the file, in the order they happened, and nothing is left
+// half written next to it.
+test("two quick saves both land, in order", async () => {
+  const dir = await freshDir();
+  const h = new History({ dir, logger: quiet });
+  const file = join(dir, "sessions.json");
+  // The first save is on disk by the time its promise settles, even
+  // with three more already queued behind it.
+  const first = h.add({ task: "Reading", minutes: 45, full: true }, at(2026, 10, 10));
+  h.addTask("Reading", "#88ccff");
+  h.setColor("Reading", "#aabbcc");
+  const last = h.add({ task: "Cleaning", minutes: 20 }, at(2026, 10, 11));
+  await first;
+  assert.deepEqual(JSON.parse(await readFile(file, "utf8")).sessions.map(s => s.task), ["Reading"]);
+
+  await last;
+  const saved = JSON.parse(await readFile(file, "utf8"));
+  assert.deepEqual(saved.sessions.map(s => s.task), ["Reading", "Cleaning"]);
+  assert.equal(saved.colors.Reading, "#aabbcc");
+  assert.deepEqual((await readdir(dir)).sort(), ["sessions.json"]);
 });
 
 // The running timer goes to its own file and comes back the same, and
