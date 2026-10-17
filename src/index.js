@@ -296,9 +296,11 @@ class TimerKey extends SingletonAction {
 
 class HeatMap extends SingletonAction {
   // Per dial on screen: its settings, the word it's showing for a moment
-  // (if any), and the last picture sent to it.
+  // (if any), the timer that will take that word down, and the last
+  // picture sent to it.
   settings = new Map();
   notices = new Map();
+  clearing = new Map();
   lastImages = new Map();
 
   async onWillAppear(ev) {
@@ -320,6 +322,8 @@ class HeatMap extends SingletonAction {
   onWillDisappear(ev) {
     this.settings.delete(ev.action.id);
     this.notices.delete(ev.action.id);
+    clearTimeout(this.clearing.get(ev.action.id));
+    this.clearing.delete(ev.action.id);
     this.lastImages.delete(ev.action.id);
   }
 
@@ -383,15 +387,22 @@ class HeatMap extends SingletonAction {
     if (act(DIAL_PRESS, null) === "nothing") await this.showNotice(ev.action, "Nothing running");
   }
 
+  // Shows a word on the dial for a moment, then puts the map back. One
+  // timer per dial: a new word cancels the old timer, so turning A, B,
+  // then A again inside two seconds can't have the first A's timer
+  // take the second A down early.
   async showNotice(target, text) {
     this.notices.set(target.id, text);
+    clearTimeout(this.clearing.get(target.id));
+    this.clearing.set(
+      target.id,
+      setTimeout(() => {
+        this.notices.delete(target.id);
+        this.clearing.delete(target.id);
+        this.render(target).catch(warn("put the map back on the dial"));
+      }, NOTICE_MS),
+    );
     await this.render(target);
-    setTimeout(() => {
-      // Only clear it if a newer message hasn't replaced it.
-      if (this.notices.get(target.id) !== text) return;
-      this.notices.delete(target.id);
-      this.render(target).catch(warn("put the map back on the dial"));
-    }, NOTICE_MS);
   }
 
   async render(target) {
