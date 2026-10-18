@@ -134,12 +134,13 @@ test("a plain countdown ignores skip and ends when it runs out", () => {
 });
 
 // The dots: finished rounds, the one I'm on, and all of them on the
-// long break.
+// long break. The face has no color of its own: that belongs to the
+// task, and index.js looks it up.
 test("the key's face counts rounds done and the current one", () => {
   const t = new Timer();
   assert.deepEqual(
     { ...t.face(mine, 0) },
-    { label: "Reading", ms: 45 * MIN, tone: "idle", color: PINK, rounds: 2, done: 0, current: 0 },
+    { label: "Reading", ms: 45 * MIN, tone: "idle", rounds: 2, done: 0, current: 0 },
   );
   t.start({ ...mine, autoStart: true }, 0);
   assert.deepEqual([t.face(mine, 0).tone, t.face(mine, 0).done, t.face(mine, 0).current], ["running", 0, 1]);
@@ -156,6 +157,17 @@ test("a key whose task isn't running shows its own idle face", () => {
   t.start(mine, 0);
   const other = t.face({ name: "Cleaning", focus: "20", intervals: false }, 5 * MIN);
   assert.deepEqual([other.label, other.ms, other.tone, other.rounds], ["Cleaning", 20 * MIN, "idle", 0]);
+  assert.equal("color" in other, false);
+});
+
+// The running timer is saved to disk as it is, so a color on it would
+// be a stale copy of the task's color. The plan keeps its color, which
+// is what a key typed before the task list existed gets added with.
+test("a running timer carries no color of its own, only its plan does", () => {
+  const t = new Timer();
+  t.start({ ...mine, color: "#88ccff" }, 0);
+  assert.equal("color" in t.run, false);
+  assert.equal(t.run.plan.color, "#88ccff");
 });
 
 // A restart in the middle of a timer: the saved copy lands on the same
@@ -168,6 +180,20 @@ test("a saved timer picks up at the right time after a restart", () => {
   const after = new Timer();
   assert.equal(after.restore(saved), true);
   assert.equal(after.timeLeft(30 * MIN), 15 * MIN);
+  assert.equal(after.tick(46 * MIN).finished, "focus");
+});
+
+// A state file from before the run lost its color still has one on it.
+// It comes back as it was, color and all, and runs out the same way.
+test("a saved timer from before, with a color on it, is picked up as it was", () => {
+  const before = new Timer();
+  before.start(mine, 0);
+  const saved = { ...JSON.parse(JSON.stringify(before.run)), color: "#88ccff" };
+
+  const after = new Timer();
+  assert.equal(after.restore(saved), true);
+  assert.equal(after.timeLeft(30 * MIN), 15 * MIN);
+  assert.equal(after.run.color, "#88ccff");
   assert.equal(after.tick(46 * MIN).finished, "focus");
 });
 
