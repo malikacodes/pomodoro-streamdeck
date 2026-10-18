@@ -186,7 +186,7 @@ class TimerKey extends SingletonAction {
     // A key on the task page has no task of its own to add.
     if (settings.name === TAPPED) return;
     const p = plan(settings);
-    history.addTask(p.task, p.color);
+    await history.addTask(p.task, p.color);
     if (settings.name === p.task) return;
 
     // Saved back so the dropdown shows the task and not "Pick a task".
@@ -213,7 +213,7 @@ class TimerKey extends SingletonAction {
       // 30 letters is more than the key can show anyway.
       const name = String(asked.name ?? "").trim().slice(0, 30);
       if (!name || name === ALL || name === TAPPED) return sendStatus("Type a name first");
-      const added = history.addTask(name, PINK);
+      const added = await history.addTask(name, PINK);
       // A new task needs no announcement: the dropdown switching to it
       // says it worked. Only the odd case gets words.
       sendStatus(added ? "" : `${name} was already on the list`);
