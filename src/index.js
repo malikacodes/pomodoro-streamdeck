@@ -194,8 +194,10 @@ class TimerKey extends SingletonAction {
 
   async onWillAppear(ev) {
     this.settings.set(ev.action.id, ev.payload.settings ?? {});
-    await this.adopt(ev.action);
-    await this.render(ev.action);
+    // A task that only just made the list has a color the other keys
+    // and dials on it haven't seen, so they all redraw, not just this one.
+    if (await this.adopt(ev.action)) redraw();
+    else await this.render(ev.action);
   }
 
   // Fires when I change something on this key's settings page.
@@ -210,19 +212,21 @@ class TimerKey extends SingletonAction {
   // Makes sure this key's task is on the list. Two kinds of key need it:
   // a brand new one, which starts out on "Focus", and one from before
   // the list existed, whose name and color were typed into the key.
-  // Those get added once, with the color the key had.
+  // Those get added once, with the color the key had. Says whether the
+  // task was new to the list.
   async adopt(target) {
     const settings = this.settings.get(target.id) ?? {};
     // A key on the task page has no task of its own to add.
-    if (settings.name === TAPPED) return;
+    if (settings.name === TAPPED) return false;
     const p = plan(settings);
-    await history.addTask(p.task, p.color);
-    if (settings.name === p.task) return;
+    const added = await history.addTask(p.task, p.color);
+    if (settings.name === p.task) return added;
 
     // Saved back so the dropdown shows the task and not "Pick a task".
     const next = { ...settings, name: p.task };
     this.settings.set(target.id, next);
     await target.setSettings(next);
+    return added;
   }
 
   // A key's settings as the timer should see them. A key on the task
@@ -797,6 +801,14 @@ streamDeck.actions.registerAction(streakKey);
 // Once a second: see if the period has run out, then redraw. This keeps
 // going when none of it is on the page I'm looking at, so the sound
 // still plays when a period ends.
+//
+// The redraw only happens when something could have changed: the timer
+// said so, a timer is on (running or paused; a countdown moves every
+// second), or the day rolled over (the heat map, the streak and today's counts all
+// move at midnight). Nothing running and the same day means every
+// picture would come out the same, and each dial would have built a
+// year of squares to find that out.
+let lastDay = dayOf(Date.now());
 setInterval(() => {
   const now = Date.now();
   const task = timer.run?.task;
@@ -806,7 +818,9 @@ setInterval(() => {
     // A timer that gave up after an hour paused ends quietly.
     if (result.finished) announce(task, result.finished);
   }
-  redraw();
+  const today = dayOf(now);
+  if (result || timer.run || today !== lastDay) redraw();
+  lastDay = today;
 }, 1000);
 
 streamDeck.connect();
