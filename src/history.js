@@ -69,6 +69,16 @@ export function lastWeeks(now, count) {
   return columns;
 }
 
+// Where a dial turn lands: ticks steps along the list from where I am,
+// going round at both ends. A current that isn't on the list (a task
+// that's gone, or nothing picked yet) counts as the top. JavaScript's %
+// keeps the minus sign (-1 % 5 is -1), so I add the length back before
+// taking it again.
+export function step(list, current, ticks) {
+  const at = Math.max(0, list.indexOf(current));
+  return list[(((at + ticks) % list.length) + list.length) % list.length];
+}
+
 const empty = () => ({ v: 1, sessions: [], colors: {} });
 
 // Whether a saved focus period counts as a session: a round that ran all

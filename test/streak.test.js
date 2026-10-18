@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { streaks } from "../src/streak.js";
+import { graceOf, modeOf, streaks } from "../src/streak.js";
 
 // Builds the same kind of map History.totals gives, with one 45 minute
 // session on each date given. Any date that's left out is a day with
@@ -181,4 +181,27 @@ test("no days, or no today, gives 0 and 0", () => {
   assert.deepEqual(streaks(new Map(), "2026-10-06", "daily", 1), { current: 0, longest: 0 });
   assert.deepEqual(streaks(focused("2026-10-06"), "", "daily", 1), { current: 0, longest: 0 });
   assert.deepEqual(streaks(new Map(), "2026-10-06", "weekly", 1), { current: 0, longest: 0 });
+});
+
+// The mode comes from the settings page as text, or not at all for a
+// key I've never touched. Anything that isn't one of the other two
+// modes is daily.
+test("the mode setting is daily unless it says weekdays or weekly", () => {
+  assert.equal(modeOf({ mode: "weekdays" }), "weekdays");
+  assert.equal(modeOf({ mode: "weekly" }), "weekly");
+  assert.equal(modeOf({ mode: "daily" }), "daily");
+  assert.equal(modeOf({ mode: "monthly" }), "daily");
+  assert.equal(modeOf({}), "daily");
+});
+
+// Grace days: 0 is a real choice (no forgiveness), so only a missing
+// or nonsense value falls back to 1. Never more than 3.
+test("grace days keep a 0, fall back to 1 for junk, and stop at 3", () => {
+  assert.equal(graceOf({ graceDays: "0" }), 0);
+  assert.equal(graceOf({ graceDays: "2" }), 2);
+  assert.equal(graceOf({ graceDays: "abc" }), 1);
+  assert.equal(graceOf({}), 1);
+  assert.equal(graceOf({ graceDays: "9" }), 3);
+  assert.equal(graceOf({ graceDays: "-1" }), 0);
+  assert.equal(graceOf({ graceDays: "1.5" }), 2);
 });

@@ -18,3 +18,4 @@ second.
 | 09 | 2026-10-17 | [Three copies of black](09-three-copies-of-black.md) |
 | 10 | 2026-10-17 | [The file that would have vanished](10-the-file-that-would-have-vanished.md) |
 | 11 | 2026-10-17 | [Nothing to read afterwards](11-nothing-to-read-afterwards.md) |
+| 12 | 2026-10-17 | [The key that knew too much](12-the-key-that-knew-too-much.md) |

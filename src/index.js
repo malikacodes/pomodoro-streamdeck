@@ -5,11 +5,11 @@ import { execFile } from "node:child_process";
 import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
 import { Presses } from "./presses.js";
-import { History, PERIODS, dayOf, lastWeeks, periodStart } from "./history.js";
+import { History, PERIODS, dayOf, lastWeeks, periodStart, step } from "./history.js";
 import { drawKey, drawOpenKey, drawStatsKey, drawStrip, isHex, short, GRAY, WEEKS_SHOWN, WEEKS_WIDE } from "./draw.js";
-import { drawGoalKey } from "./goal.js";
+import { drawGoalKey, goalOf } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
-import { streaks } from "./streak.js";
+import { graceOf, modeOf, streaks } from "./streak.js";
 import { SWAY_MS, TIERS, drawStreakKey } from "./flames.js";
 
 const NOTICE_MS = 2000;
@@ -27,6 +27,19 @@ const history = new History({ logger: streamDeck.logger });
 // picture packed into one long string.
 function asImage(svg) {
   return `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`;
+}
+
+// Sends a picture to a key or dial, unless it's the one already there.
+// Every setImage is a message to Stream Deck, so a picture only goes
+// out when it's different from the last one sent to that key. Each
+// class keeps its own lastImages map, since each forgets a key when it
+// leaves the page. A dial takes its picture a different way from a key.
+async function send(target, lastImages, svg) {
+  const image = asImage(svg);
+  if (lastImages.get(target.id) === image) return;
+  lastImages.set(target.id, image);
+  if (target.controllerType === "Encoder") await target.setFeedback({ canvas: image });
+  else await target.setImage(image);
 }
 
 // For the places that ask Stream Deck for something and don't wait for
@@ -280,17 +293,11 @@ class TimerKey extends SingletonAction {
   }
 
   async render(target) {
-    // Every setImage is a message to Stream Deck, so a picture only goes
-    // out when it's different from the last one. Most seconds it is,
-    // while a timer runs, and never while nothing does.
     const settings = this.settingsOf(target.id);
     const face = timer.face(settings, Date.now());
     // The color belongs to the task now, not to the key.
     face.color = colorFor(plan(settings).task);
-    const image = asImage(drawKey(face));
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setImage(image);
+    await send(target, this.lastImages, drawKey(face));
   }
 }
 
@@ -333,14 +340,6 @@ class HeatMap extends SingletonAction {
     return this.settings.get(id)?.task === TAPPED;
   }
 
-  // Where a turn lands: ticks steps along the list from where I am, going
-  // round at both ends. JavaScript's % keeps the minus sign (-1 % 5 is
-  // -1), so I add the length back before taking it again.
-  step(list, current, ticks) {
-    const at = Math.max(0, list.indexOf(current));
-    return list[(((at + ticks) % list.length) + list.length) % list.length];
-  }
-
   // Turning flips through All and then each task. The name shows for a
   // moment so I know which map I've landed on. On the task page there's
   // no All: turning any of the four dials moves the whole page to the
@@ -349,7 +348,7 @@ class HeatMap extends SingletonAction {
     if (this.onTaskPage(ev.action.id)) {
       const tasks = history.tasks();
       if (tasks.length === 0) return;
-      const next = this.step(tasks, history.tapped(), ev.payload.ticks);
+      const next = step(tasks, history.tapped(), ev.payload.ticks);
       history.tap(next);
       // The name goes across all four dials at once.
       for (const dial of this.actions) {
@@ -359,7 +358,7 @@ class HeatMap extends SingletonAction {
       return;
     }
 
-    const next = this.step([null, ...history.tasks()], pickedTask(this.settings.get(ev.action.id)), ev.payload.ticks);
+    const next = step([null, ...history.tasks()], pickedTask(this.settings.get(ev.action.id)), ev.payload.ticks);
     const settings = { ...this.settings.get(ev.action.id), task: next ?? ALL };
     this.settings.set(ev.action.id, settings);
     // Saved in the dial's settings so it's on the same map after a
@@ -414,7 +413,9 @@ class HeatMap extends SingletonAction {
     // "wide" is the map across all four dials. Each dial draws the slice
     // for the column it sits in.
     const wide = settings.wide === true;
-    const image = asImage(
+    await send(
+      target,
+      this.lastImages,
       drawStrip({
         columns: lastWeeks(Date.now(), wide ? WEEKS_WIDE : WEEKS_SHOWN),
         totals: history.totals(task),
@@ -425,9 +426,6 @@ class HeatMap extends SingletonAction {
         slot: wide ? (target.coordinates?.column ?? 0) : undefined,
       }),
     );
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setFeedback({ canvas: image });
   }
 }
 
@@ -505,7 +503,9 @@ class StatsKey extends SingletonAction {
     const task = pickedTask(settings);
     const period = this.period(settings);
     const now = Date.now();
-    const image = asImage(
+    await send(
+      target,
+      this.lastImages,
       drawStatsKey({
         label: task ?? "All tasks",
         sessions: history.sessionCount(task, periodStart(period, now)),
@@ -513,9 +513,6 @@ class StatsKey extends SingletonAction {
         color: task ? colorFor(task) : PINK,
       }),
     );
-    if (this.lastImages.get(target.id) === image) return;
-    this.lastImages.set(target.id, image);
-    await target.setImage(image);
   }
 }
 
@@ -567,14 +564,6 @@ class GoalKey extends SingletonAction {
     sendTasks();
   }
 
-  // The settings page shows 4 before anything is picked, but it doesn't
-  // save that until I change it, so a new key arrives with no goal at
-  // all. Whatever does arrive is turned into a whole number from 1 to 12.
-  goal(settings) {
-    const goal = Math.round(Number(settings?.goal ?? 4));
-    return Math.min(12, Math.max(1, goal || 4));
-  }
-
   sessionsToday(settings) {
     const now = Date.now();
     return history.sessionCount(pickedTask(settings), periodStart("today", now));
@@ -591,7 +580,7 @@ class GoalKey extends SingletonAction {
   // starts it over.
   async onKeyDown(ev) {
     const settings = this.settings.get(ev.action.id);
-    if (!settings || this.sessionsToday(settings) < this.goal(settings)) return;
+    if (!settings || this.sessionsToday(settings) < goalOf(settings)) return;
     this.celebrate(ev.action);
     await this.render(ev.action);
   }
@@ -606,7 +595,7 @@ class GoalKey extends SingletonAction {
 
     const now = Date.now();
     const today = dayOf(now);
-    const goal = this.goal(settings);
+    const goal = goalOf(settings);
     const count = this.sessionsToday(settings);
     const task = pickedTask(settings);
 
@@ -623,13 +612,12 @@ class GoalKey extends SingletonAction {
     const began = this.started.get(target.id);
     const burst = began === undefined ? undefined : (now - began) / CELEBRATION_MS;
 
-    // Past the goal the ring just stays full, and the count keeps going.
-    const image = asImage(drawGoalKey(count, `of ${goal}`, GRAY, Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
-    const same = this.lastImages.get(target.id) === image;
-    this.lastImages.set(target.id, image);
-
+    // The date goes to Stream Deck before the picture does, so a restart
+    // between the two still knows today is done.
     if (starting) await target.setSettings({ ...settings, celebrated: today });
-    if (!same) await target.setImage(image);
+
+    // Past the goal the ring just stays full, and the count keeps going.
+    await send(target, this.lastImages, drawGoalKey(count, `of ${goal}`, GRAY, Math.min(1, count / goal), count >= goal, burst, task ? colorFor(task) : PINK));
   }
 
   // Starts a key's stopwatch and puts it in the queue for animation
@@ -711,20 +699,6 @@ class StreakKey extends SingletonAction {
     await this.render(ev.action);
   }
 
-  // The settings page shows Daily and 1 before anything is picked, but
-  // it doesn't save them until I change them, so a new key arrives with
-  // no settings at all. Whatever does arrive is checked.
-  mode(settings) {
-    return settings.mode === "weekdays" || settings.mode === "weekly" ? settings.mode : "daily";
-  }
-
-  // 0 is a real choice here (no grace at all), so the default of 1 is
-  // only for a value that's missing or isn't a number.
-  grace(settings) {
-    const grace = Number(settings.graceDays ?? 1);
-    return Number.isNaN(grace) ? 1 : Math.min(3, Math.max(0, Math.round(grace)));
-  }
-
   // The one place a key gets its picture from, whether the fire is
   // cold, swaying or flaring.
   async render(target) {
@@ -734,8 +708,8 @@ class StreakKey extends SingletonAction {
 
     const now = Date.now();
     const task = pickedTask(settings);
-    const mode = this.mode(settings);
-    const { current } = streaks(history.totals(task), dayOf(now), mode, this.grace(settings));
+    const mode = modeOf(settings);
+    const { current } = streaks(history.totals(task), dayOf(now), mode, graceOf(settings));
 
     // A new number gets a burst. That covers a key that has just
     // appeared too, because it has no last number yet. 0 never bursts.
@@ -761,10 +735,7 @@ class StreakKey extends SingletonAction {
 
     // The small line says which task, when it's only one. A long name
     // is cut so it stays inside the key.
-    const image = asImage(drawStreakKey(current, task ? short(task, 14) : "", GRAY, tier, burst, sway));
-    const same = this.lastImages.get(target.id) === image;
-    this.lastImages.set(target.id, image);
-    if (!same) await target.setImage(image);
+    await send(target, this.lastImages, drawStreakKey(current, task ? short(task, 14) : "", GRAY, tier, burst, sway));
   }
 
   // Starts a key's burst stopwatch and puts it in the queue for
