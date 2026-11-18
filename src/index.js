@@ -1,6 +1,7 @@
 // The only file that talks to Stream Deck. It passes presses and turns to
 // the timer, saves what the timer hands back, and redraws the keys and
-// dials. The thinking is in timer.js, presses.js, history.js and draw.js.
+// dials. The thinking is in timer.js, countdown.js, presses.js, history.js
+// and draw.js.
 import { execFile } from "node:child_process";
 import streamDeck, { action, SingletonAction } from "@elgato/streamdeck";
 import { Timer, plan, PINK } from "./timer.js";
@@ -11,6 +12,7 @@ import { drawGoalKey, goalOf } from "./goal.js";
 import { animate, idle, stopAnimating, stopIdling } from "./animate.js";
 import { graceOf, modeOf, streaks } from "./streak.js";
 import { SWAY_MS, TIERS, drawStreakKey } from "./flames.js";
+import { Countdown } from "./countdown.js";
 
 const NOTICE_MS = 2000;
 
@@ -449,6 +451,74 @@ class OpenKey extends SingletonAction {
   }
 }
 
+// The Countdown key: tap to start, pause or carry on, hold to reset. It
+// has its own countdown per key and never goes through act(), so a
+// focus round running somewhere else can't block it, and it never shows
+// the yellow triangle. Nothing it does is kept in the history.
+class CountdownKey extends SingletonAction {
+  settings = new Map();
+  lastImages = new Map();
+
+  // One countdown per key. These stay when a key leaves the page, so
+  // switching pages mid-chat doesn't stop the clock. A plugin restart
+  // does start them over, since they're only kept in memory.
+  countdowns = new Map();
+
+  async onWillAppear(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  async onDidReceiveSettings(ev) {
+    this.settings.set(ev.action.id, ev.payload.settings ?? {});
+    await this.render(ev.action);
+  }
+
+  onWillDisappear(ev) {
+    countdownPresses.forget(ev.action.id);
+    this.settings.delete(ev.action.id);
+    this.lastImages.delete(ev.action.id);
+  }
+
+  // Double tap is always off here, so a tap lands the moment I let go.
+  onKeyDown(ev) {
+    countdownPresses.down(ev.action.id, false);
+  }
+
+  onKeyUp(ev) {
+    countdownPresses.up(ev.action.id);
+  }
+
+  countdownOf(id) {
+    if (!this.countdowns.has(id)) this.countdowns.set(id, new Countdown());
+    return this.countdowns.get(id);
+  }
+
+  pressed(id, kind) {
+    const target = [...this.actions].find(each => each.id === id);
+    if (!target) return;
+    const countdown = this.countdownOf(id);
+    if (kind === "hold") countdown.reset();
+    else countdown.tap(this.settings.get(id), Date.now());
+    this.render(target).catch(warn("draw the countdown key"));
+  }
+
+  // From the once-a-second tick at the bottom. Only a key whose picture
+  // could have moved gets drawn.
+  tick(now) {
+    for (const target of this.actions) {
+      if (this.countdowns.get(target.id)?.tick(now)) this.render(target).catch(warn("draw the countdown key"));
+    }
+  }
+
+  async render(target) {
+    // No settings means the key went away while a redraw was on its way.
+    const settings = this.settings.get(target.id);
+    if (!settings) return;
+    await send(target, this.lastImages, drawKey(this.countdownOf(target.id).face(settings, Date.now())));
+  }
+}
+
 // How each stretch of time reads along the bottom of the stats key.
 // This year reads as the year itself, like on my GitHub stats key.
 function periodName(period, now) {
@@ -767,7 +837,9 @@ const streakKey = new (action({ UUID: "com.malikacodes.pomodoro.streak" })(Strea
 const goalKey = new (action({ UUID: "com.malikacodes.pomodoro.goal" })(GoalKey))();
 const statsKey = new (action({ UUID: "com.malikacodes.pomodoro.stats" })(StatsKey))();
 const heatMap = new (action({ UUID: "com.malikacodes.pomodoro.heatmap" })(HeatMap))();
+const countdownKey = new (action({ UUID: "com.malikacodes.pomodoro.countdown" })(CountdownKey))();
 const presses = new Presses((id, kind) => timerKey.pressed(id, kind));
+const countdownPresses = new Presses((id, kind) => countdownKey.pressed(id, kind));
 
 // Redraws every key and dial on the page. The "is it different" check in
 // each render keeps this cheap.
@@ -797,6 +869,7 @@ streamDeck.actions.registerAction(openKey);
 streamDeck.actions.registerAction(statsKey);
 streamDeck.actions.registerAction(goalKey);
 streamDeck.actions.registerAction(streakKey);
+streamDeck.actions.registerAction(countdownKey);
 
 // Once a second: see if the period has run out, then redraw. This keeps
 // going when none of it is on the page I'm looking at, so the sound
@@ -821,6 +894,9 @@ setInterval(() => {
   const today = dayOf(now);
   if (result || timer.run || today !== lastDay) redraw();
   lastDay = today;
+  // The Countdown keys sit outside redraw(), since nothing about the
+  // Pomodoro timer changes them. They only draw when they've moved.
+  countdownKey.tick(now);
 }, 1000);
 
 streamDeck.connect();
