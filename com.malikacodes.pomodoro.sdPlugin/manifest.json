@@ -112,6 +112,22 @@
       ]
     },
     {
+      "UUID": "com.malikacodes.pomodoro.countdown",
+      "Name": "Countdown",
+      "Tooltip": "A countdown of its own, for a coffee chat or a call. Tap to start, pause or carry on. Hold to reset. It runs next to any Pomodoro task and isn't saved as focus time.",
+      "Icon": "imgs/countdown",
+      "Controllers": [
+        "Keypad"
+      ],
+      "UserTitleEnabled": false,
+      "PropertyInspectorPath": "ui/countdown.html",
+      "States": [
+        {
+          "Image": "imgs/key"
+        }
+      ]
+    },
+    {
       "UUID": "com.malikacodes.pomodoro.open",
       "Name": "Open Pomodoro",
       "Tooltip": "Opens my Pomodoro page on this deck. On the task page it's the way back.",

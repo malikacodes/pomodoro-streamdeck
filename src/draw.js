@@ -73,16 +73,20 @@ export function ramp(picked) {
 
 // The key, 144 by 144 pixels: a small word on top, the time in the
 // middle, and one dot per round along the bottom. face comes from
-// Timer.face in timer.js.
+// Timer.face in timer.js, or Countdown.face in countdown.js.
 export function drawKey(face) {
   // White while it's counting, gray when it isn't, and the task's own
-  // color on a break so I can tell a break from focus at a glance.
-  const fill = { running: "#ffffff", break: color(face.color), paused: DIM, idle: DIM }[face.tone];
+  // color on a break so I can tell a break from focus at a glance. The
+  // Countdown key's "done" (from countdown.js) is in color too, so 0:00
+  // jumps out instead of looking like a key that's just off. It has no
+  // task, so its color is the pink fallback.
+  const colored = face.tone === "break" || face.tone === "done";
+  const fill = colored ? color(face.color) : { running: "#ffffff", paused: DIM, idle: DIM }[face.tone];
 
   const parts = [
     `<svg xmlns="http://www.w3.org/2000/svg" width="144" height="144" viewBox="0 0 144 144" font-family="${FONT}">`,
     `<rect width="144" height="144" fill="${BLACK}"/>`,
-    `<text x="72" y="38" fill="${face.tone === "break" ? fill : GRAY}" font-size="20" font-weight="600" text-anchor="middle">${safe(short(face.label, 12))}</text>`,
+    `<text x="72" y="38" fill="${colored ? fill : GRAY}" font-size="20" font-weight="600" text-anchor="middle">${safe(short(face.label, 12))}</text>`,
     `<text x="72" y="88" fill="${fill}" font-size="38" font-weight="600" text-anchor="middle">${clock(face.ms)}</text>`,
   ];
 

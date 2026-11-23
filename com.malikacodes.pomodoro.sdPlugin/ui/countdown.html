@@ -1,0 +1,22 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <!-- Elgato's settings components. Each one saves into this key's
+         settings under the name in "setting". -->
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <!-- The small word on top. Twelve letters is all the key shows.
+         Left empty, it says Coffee Chat, which is what I made it for. -->
+    <sdpi-item label="Label">
+      <sdpi-textfield setting="label" placeholder="Coffee Chat" maxlength="12"></sdpi-textfield>
+    </sdpi-item>
+    <!-- How long, in minutes. Anything that isn't a number goes back to
+         the 15 shown in the box (see countdownPlan in src/countdown.js).
+         A new length shows up the next time it's full, not mid-count. -->
+    <sdpi-item label="Minutes">
+      <sdpi-textfield setting="minutes" placeholder="15" pattern="[0-9.]*"></sdpi-textfield>
+    </sdpi-item>
+  </body>
+</html>

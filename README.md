@@ -14,6 +14,7 @@ focused.
 | 🔢 Sessions | A key that counts my finished focus sessions, for one task or all of them. Press it to step through today, this week, this year and all time. |
 | 🎯 Daily Goal | A key with a ring that fills as today's sessions get closer to my goal, and confetti the first time I get there. Once it's met, a press plays the confetti again. |
 | 🔥 Streak | A key with how many days in a row I've focused, and a fire that grows with it, from an ember to a bonfire. Press it to make the fire flare. |
+| ⏳ Countdown | A plain countdown that isn't a task, 15 minutes unless I change it. Tap to start, pause or carry on, hold to reset. At 0:00 it turns pink and says Done, and a tap puts it back. It runs next to a focus round and never counts as focus time. |
 | ⏱ Open Pomodoro | A key that opens my main Pomodoro page on the deck it's on. On the task page it's the Back key. |
 
 ![The key waiting, counting, paused and on a break](journal/assets/01-a-timer-on-a-key/key.png)
@@ -99,6 +100,10 @@ The Streak key has three: Task, Streak mode (daily, weekdays only, or
 weekly) and Grace days (how many missed days in a row a streak
 survives, 0 to 3, 1 until I change it).
 
+The Countdown key has two: Label (the word on top, Coffee Chat until
+I change it) and Minutes (15 until I change it). A new length shows the
+next time it's full, not halfway through.
+
 The Heat Map dial has one setting, Show: all tasks, or one task from
 the same list. Turning the dial changes the same thing.
 
@@ -137,6 +142,12 @@ key press → presses.js (tap, double or hold?) → timer.js → history.js → 
 - **One timer at a time.** If one task is running, another task's key
   shows Stream Deck's yellow warning triangle and does nothing. I didn't
   want a stray press on the wrong key to end a session.
+- **The Countdown key isn't a task.** My Coffee Chat key used to be a
+  one-round Timer, and one night it showed the triangle mid-chat
+  because a focus round was going on my other deck, which was off. Now
+  it has its own clock per key, skips the one-at-a-time rule, and
+  nothing it does goes in the history. It doesn't remember where it
+  was if the plugin restarts.
 - **A forgotten timer lets go after an hour.** Only one task runs at a
   time, so a timer I paused and walked away from would block every
   other key until I found it. The hour is `GIVE_UP_MS` in
